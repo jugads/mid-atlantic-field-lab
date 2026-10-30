@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const {Simulation} = require('../dist/physics.js');
+let s = new Simulation({stationary:100});
+for(let i=0;i<600;i++) s.step(1/120,{shoot:true});
+assert.equal(s.fired,8); assert.equal(s.resolved,8); assert.equal(s.score,8);
+s = new Simulation({capacity:1}); s.inventory=0;
+s.balls=[{x:2.8,y:4.035,z:.075,vx:0,vy:0,vz:0}];
+s.step(1/120,{}); assert.equal(s.inventory,1);
+s = new Simulation();
+for(let i=0;i<2400;i++) s.step(1/120,{left:true});
+assert(s.robot.x>=s.radius);
+s = new Simulation();
+for(let i=0;i<1200;i++) s.step(1/120,{right:true});
+assert(Math.hypot(s.robot.x-4.5,s.robot.y-4.035)>=s.radius+.67-1e-7);
+s = new Simulation(); let count=s.balls.length+s.inventory;
+s.setConfig({capacity:2}); assert.equal(s.inventory,2); assert.equal(s.balls.length+s.inventory,count);
+console.log('Passed: ballistic scoring, inventory, intake, wall and hub collision, capacity reduction.');
