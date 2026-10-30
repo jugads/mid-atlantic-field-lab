@@ -3,7 +3,7 @@ const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset}=globalThis.FieldPhysic
 export class FieldView {
   constructor(canvas){
     this.canvas=canvas;this.mode='follow';this.theta=0;this.phi=.89;this.distance=20;this.zoom=1;
-    this.scene=new T.Scene();this.scene.background=new T.Color('#181e1c');
+    this.scene=new T.Scene();this.scene.background=new T.Color('#1b1424');
     this.camera=new T.PerspectiveCamera(46,1,.1,120);this.cameraTarget=new T.Vector3();
     try{this.renderer=new T.WebGLRenderer({canvas,antialias:true});}
     catch(error){document.getElementById('hint').textContent='3D needs WebGL. Enable hardware acceleration or try another browser.';throw error;}
@@ -18,7 +18,7 @@ export class FieldView {
     this.fuel=new T.InstancedMesh(new T.SphereGeometry(BR,10,7),this.material('#f3cd38'),600);
     this.fuel.instanceMatrix.setUsage(T.DynamicDrawUsage);this.fuel.castShadow=true;this.fuel.frustumCulled=false;
     this.scene.add(this.fuel);this.fuelMatrix=new T.Matrix4();
-    this.aimLine=new T.Line(new T.BufferGeometry(),new T.LineDashedMaterial({color:0xd0ed93,dashSize:.12,gapSize:.08,transparent:true,opacity:.45}));this.scene.add(this.aimLine);
+    this.aimLine=new T.Line(new T.BufferGeometry(),new T.LineDashedMaterial({color:0xc8a5ff,dashSize:.12,gapSize:.08,transparent:true,opacity:.45}));this.scene.add(this.aimLine);
     this.passMarker=new T.Mesh(new T.RingGeometry(.45,.49,32),new T.MeshBasicMaterial({color:'#f2ce64',side:T.DoubleSide,transparent:true,opacity:.8}));
     this.passMarker.rotation.x=-Math.PI/2;this.scene.add(this.passMarker);
     this.pointer=null;
@@ -44,10 +44,10 @@ export class FieldView {
     }
   }
   buildField(){
-    this.box(W+.25,.16,H+.25,0,-.13,0,'#151b18');this.box(W,.04,H,0,-.03,0,'#44494b');
+    this.box(W+.25,.16,H+.25,0,-.13,0,'#201929');this.box(W,.04,H,0,-.03,0,'#48414f');
     this.gridGroup=new T.Group();this.scene.add(this.gridGroup);
-    for(let x=-W/2;x<=W/2;x+=.5)this.box(.006,.002,H,x,.001,0,'#4b5351',this.gridGroup);
-    for(let z=-H/2;z<=H/2;z+=.5)this.box(W,.002,.006,0,.001,z,'#4b5351',this.gridGroup);
+    for(let x=-W/2;x<=W/2;x+=.5)this.box(.006,.002,H,x,.001,0,'#514958',this.gridGroup);
+    for(let z=-H/2;z<=H/2;z+=.5)this.box(W,.002,.006,0,.001,z,'#514958',this.gridGroup);
     this.box(.05,.008,H,0,.008,0,'#c7cdc5');
     for(const z of [-H/2,H/2]){
       this.box(W+.1,.035,.035,0,.508,z,'#8f9897');const glass=this.box(W,.48,.015,0,.25,z,'#a8bdc6');glass.material.transparent=true;glass.material.opacity=.08;glass.castShadow=false;
@@ -115,7 +115,6 @@ export class FieldView {
     const sd=FIELD.centerDepth,sw=FIELD.centerWidth;
     for(const x of [-sd/2,sd/2])this.box(.012,.004,sw,x,.007,0,'#7b816c');
     for(const z of [-sw/2,sw/2])this.box(sd,.004,.012,0,.007,z,'#7b816c');
-    this.label('MID-ATLANTIC  /  FIELD LAB',0,H/2-.35,'#89968a',.65);
   }
   disposeGroup(group){
     group.traverse(o=>{o.geometry?.dispose();if(o.material){o.material.map?.dispose();o.material.dispose();}});
@@ -200,7 +199,7 @@ export class FieldView {
     const power=Math.hypot(target.x-r.x-r.vx*flight,target.y-r.y-r.vy*flight)/flight;
     const vx=manual?Math.cos(aim)*power+r.vx:(target.x-r.x)/flight,vy=manual?Math.sin(aim)*power+r.vy:(target.y-r.y)/flight;
     for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+vx*t,launch+vz*t-4.905*t*t,z+vy*t));}
-    this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#d0ed93');
+    this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#c8a5ff');
     this.passMarker.visible=passing;this.passMarker.position.set(target.x-W/2,.025,target.y-H/2);
     const side=c.alliance==='blue'?-1:1,fit=this.camera.aspect<1.25?1.2:1;
     if(this.mode==='driver'){
