@@ -173,6 +173,21 @@ test('multiple robot starts use distinct lanes on either alliance',()=>{
  assert(s.addRobot(resolvePreset('1391','red')));const r=s.robot;
  assert.equal(r.startArea,'trench');assert(r.x-s.config.length/2>=W-FIELD.startLine-1e-5);assert(Math.abs(r.a-Math.PI)<1e-8);
 });
+test('shooting or passing limits swerve and tank robots to 30% drive speed',()=>{
+ for(const drive of ['swerve','tank']){
+  const s=empty({drive,feedRate:1,capacity:80,autoAim:false});s.start();s.time=25;s.robot.x=6.5;s.robot.y=1;s.inventory=80;
+  const input=drive==='tank'?{forward:1,shoot:true}:{moveX:1,moveY:0,shoot:true};
+  advance(s,1,input);assert(Math.abs(Math.hypot(s.robot.vx,s.robot.vy)-s.config.maxSpeed*.3)<.02,drive+' should be limited to 30%');
+  assert(s.robot.shootingSpeedLimited);assert(s.passed>0,'outside the alliance zone, firing is passing');
+  advance(s,.4,{...input,shoot:false});assert(Math.hypot(s.robot.vx,s.robot.vy)>s.config.maxSpeed*.8,drive+' should regain speed after release');
+ }
+});
+test('pressing shoot while moving brakes into the lower limit; empty robots are unrestricted',()=>{
+ const s=empty({feedRate:1,capacity:80,autoAim:false});s.start();s.time=25;s.robot.x=6.5;s.robot.y=1;s.inventory=80;
+ advance(s,.55,{moveX:1,moveY:0});assert(Math.abs(s.robot.vx-5)<.02);
+ advance(s,.15,{moveX:1,moveY:0,shoot:true});assert(Math.abs(s.robot.vx-1.5)<.02);
+ s.inventory=0;advance(s,.4,{moveX:1,moveY:0,shoot:true});assert(!s.robot.shootingSpeedLimited);assert(s.robot.vx>4);
+});
 test('outside alliance zone, Space ferries fuel to home carpet',()=>{
  const s=empty();s.start();s.time=25;s.inventory=1;s.robot.x=W/2;s.robot.y=H/2-1.65;
  assert.equal(s.shotMode,'pass');advance(s,2,{shoot:true});assert.equal(s.passed,1);assert.equal(s.fired,0);assert.equal(s.score,0);

@@ -252,10 +252,13 @@
       if(c.drive==='tank'){turn=clamp(turn+(input.right?1:0)-(input.left?1:0)+(input.tankTurn||0),-1,1);const f=clamp(input.forward??((input.up?1:0)-(input.down?1:0)),-1,1);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
       r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
       const bumpFactor=clamp(Math.max(r.z,terrainHeight(r.x,r.y))/FIELD.bumpHeight,0,1);
-      const max=c.maxSpeed*(1-.22*bumpFactor);
-      // Brake much harder when the stick is neutral; commanded acceleration is unchanged.
+      // Shooting and passing limit drive speed to 30% while fuel is available.
+      r.shootingSpeedLimited=!!input.shoot&&this.inventory>0;
+      const max=c.maxSpeed*(1-.22*bumpFactor)*(r.shootingSpeedLimited?.3:1);
+      // Brake into the lower shooting limit, and when the stick is neutral.
       const braking=Math.max(12,c.acceleration*3);
-      let dx=x*max-r.vx,dy=y*max-r.vy,delta=Math.hypot(dx,dy),step=(len>0?c.acceleration:braking)*dt;
+      const slowingForShot=r.shootingSpeedLimited&&Math.hypot(r.vx,r.vy)>max;
+      let dx=x*max-r.vx,dy=y*max-r.vy,delta=Math.hypot(dx,dy),step=(len>0&&!slowingForShot?c.acceleration:braking)*dt;
       if(delta>step){dx*=step/delta;dy*=step/delta;}r.vx+=dx;r.vy+=dy;r.x+=r.vx*dt;r.y+=r.vy*dt;
       this.resolveRobot();this.updatePose(dt);
     }
@@ -327,7 +330,7 @@
         this.autoScores.blue>this.autoScores.red?'blue':'red';
       const c=this.config,r=this.robot,auto=this.time<20;
       const control=this.controlsEnabled?input:{};
-      if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;}
+      if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;r.shootingSpeedLimited=false;}
       this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
       if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise&&Math.abs(control.turnAxis||0)<.01&&Math.abs(control.tankTurn||0)<.01){
