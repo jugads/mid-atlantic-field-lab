@@ -22,7 +22,7 @@
     width:FIELD.hubSize,depth:FIELD.trenchWidth,alliance:h.alliance,sign})));
   const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65,hub:true,alliance:h.alliance}));
   for (const t of trenches) solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:1.022});
-  const TOWER={depth:1.148,width:1.45,postX:.95,postGap:1.35,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[.90,1.143,1.6002]};
+  const TOWER={depth:1.148,width:1.9,postX:.95,postGap:1.8,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[.90,1.143,1.6002]};
   const towers=['blue','red'].map(alliance=>({alliance,x:alliance==='blue'?TOWER.postX:W-TOWER.postX,y:H/2}));
   for(const t of towers){
     for(const side of [-1,1])solids.push({x:t.x,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:TOWER.postDepth,depth:TOWER.postWidth,height:TOWER.postHeight,bottom:0,tower:true});
@@ -271,7 +271,7 @@
       if(delta>step){dx*=step/delta;dy*=step/delta;}r.vx+=dx;r.vy+=dy;r.x+=r.vx*dt;r.y+=r.vy*dt;
       this.resolveRobot();this.updatePose(dt);
     }
-    collideBallBox(b,box){
+    collideBallBox(b,box,restitution=.4){
       const bottom=box.bottom||0;if(b.z-BR>box.height||b.z+BR<bottom)return;
       const closestX=clamp(b.x,box.x-box.width/2,box.x+box.width/2),closestY=clamp(b.y,box.y-box.depth/2,box.y+box.depth/2),closestZ=clamp(b.z,bottom,box.height);
       let dx=b.x-closestX,dy=b.y-closestY,dz=b.z-closestZ,d=Math.hypot(dx,dy,dz);if(d>=BR)return;
@@ -282,7 +282,7 @@
         faces.sort((a,b)=>a.d-b.d);const n=faces[0];b.x+=n.nx*(BR+n.d);b.y+=n.ny*(BR+n.d);b.z+=n.nz*(BR+n.d);dx=n.nx;dy=n.ny;dz=n.nz;d=1;
       }else{b.x+=dx/d*(BR-d);b.y+=dy/d*(BR-d);b.z+=dz/d*(BR-d);}
       const nx=dx/d,ny=dy/d,nz=dz/d,v=b.vx*nx+b.vy*ny+b.vz*nz;
-      if(v<0){b.vx-=1.4*v*nx;b.vy-=1.4*v*ny;b.vz-=1.4*v*nz;}
+      if(v<0){b.vx-=(1+restitution)*v*nx;b.vy-=(1+restitution)*v*ny;b.vz-=(1+restitution)*v*nz;}
     }
     collideHubRim(b,h){
       // A tube around the opening lets glancing shots visibly rebound instead of vanishing.
@@ -317,7 +317,8 @@
             if(d>=cell)continue;const nx=d?xx/d:1,ny=d?yy/d:0,nz=d?zz/d:0,overlap=(cell-d)*.5;
             b.x+=nx*overlap;b.y+=ny*overlap;b.z+=nz*overlap;o.x-=nx*overlap;o.y-=ny*overlap;o.z-=nz*overlap;
             const relative=(b.vx-o.vx)*nx+(b.vy-o.vy)*ny+(b.vz-o.vz)*nz;
-            if(relative<0){const impulse=-relative*.65;b.vx+=nx*impulse;b.vy+=ny*impulse;b.vz+=nz*impulse;o.vx-=nx*impulse;o.vy-=ny*impulse;o.vz-=nz*impulse;}
+            if(relative<0){const grounded=b.z<=terrainHeight(b.x,b.y)+BR+.02&&o.z<=terrainHeight(o.x,o.y)+BR+.02;
+              const impulse=-relative*(grounded?.51:.65);b.vx+=nx*impulse;b.vy+=ny*impulse;b.vz+=nz*impulse;o.vx-=nx*impulse;o.vy-=ny*impulse;o.vz-=nz*impulse;}
           }
         }
         const key=hash(ix,iy,iz);if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(i);
@@ -388,7 +389,7 @@
           const pointVx=r.vx-r.omega*dy,pointVy=r.vy+r.omega*dx;
           const rvx=b.vx-pointVx,rvy=b.vy-pointVy;
           const local={...b,x:forward,y:side,vx:rvx*ca+rvy*sa,vy:-rvx*sa+rvy*ca};
-          const beforeX=local.x,beforeY=local.y,beforeZ=local.z;this.collideBallBox(local,{x:0,y:0,width:c.length,depth:c.width,height:r.z+c.height});
+          const beforeX=local.x,beforeY=local.y,beforeZ=local.z;this.collideBallBox(local,{x:0,y:0,width:c.length,depth:c.width,height:r.z+c.height},0);
           if(local.x!==beforeX||local.y!==beforeY||local.z!==beforeZ){b.z=local.z;b.vz=local.vz;b.x=r.x+local.x*ca-local.y*sa;b.y=r.y+local.x*sa+local.y*ca;
             b.vx=local.vx*ca-local.vy*sa+pointVx;b.vy=local.vx*sa+local.vy*ca+pointVy;}
         }

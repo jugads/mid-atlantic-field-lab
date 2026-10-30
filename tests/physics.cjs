@@ -280,6 +280,20 @@ test('robot contact uses relative velocity without repeated energy injection',()
  const s=empty({maxSpeed:4});s.start();s.time=25;s.intake=false;s.robot.x=7;s.robot.y=1;s.robot.vx=4;
  s.balls=[{...ball(s.robot.x+s.config.length/2+BR-.005,1),vx:4}];advance(s,.3,{right:true});assert(Math.hypot(s.balls[0].vx,s.balls[0].vy)<6);
 });
+test('fuel compressed against a wall does not gain excessive speed',()=>{
+ const s=empty({intakeRate:1});s.start();s.time=25;s.intake=false;
+ Object.assign(s.robot,{x:1.7,y:1.2,a:Math.PI,vx:-5,vy:0});
+ s.balls=[];for(let x=BR+.01;x<1.04;x+=2*BR+.006)for(let y=.9;y<1.5;y+=2*BR+.006)s.balls.push(ball(x,y));
+ let peak=0;for(let i=0;i<100;i++){s.step(1/120,{left:true});for(const b of s.balls)peak=Math.max(peak,Math.hypot(b.vx,b.vy,b.vz));}
+ assert(peak<7,`fuel speed ${peak.toFixed(2)} m/s`);assert(s.balls.every(b=>Number.isFinite(b.x)&&b.x>=BR-1e-8));
+});
+test('wide tower opening accepts offset approaches',()=>{
+ for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
+  const s=empty(resolvePreset(team,alliance)),x=alliance==='blue'?TOWER.postX:W-TOWER.postX;
+  Object.assign(s.robot,{x,y:H/2+.3,z:0,a:0,vx:0,vy:0});s.resolveRobot();
+  assert(Math.abs(s.robot.x-x)<1e-6&&Math.abs(s.robot.y-(H/2+.3))<1e-6,team+' fits an offset approach');
+ }
+});
 test('tower rungs have vertical clearance and block at their actual height',()=>{
  const s=empty(),rung=solids.find(b=>b.tower&&Math.abs(b.bottom-(TOWER.rungs[0]-TOWER.rungDiameter/2))<1e-8);
  const low=ball(rung.x,rung.y,.2);s.collideBallBox(low,rung);assert.equal(low.x,rung.x);assert.equal(low.z,.2);
