@@ -129,10 +129,24 @@ export class FieldView {
     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(l*.89,h-.22,w*.89)),new T.LineBasicMaterial({color:'#c4cbb4',transparent:true,opacity:.45}));
     outline.position.y=.23+(h-.22)/2;group.add(outline);
     const fill=this.box(l*.83,1,w*.83,0,.23,0,'#e4c646',group);fill.castShadow=false;
-    const intakeBar=this.box(.045,.09,w*.85,l/2+.02,.16,0,'#d0ed93',group);
-    const cv=document.createElement('canvas');cv.width=256;cv.height=128;const ct=cv.getContext('2d');ct.fillStyle=color;ct.fillRect(0,0,256,128);ct.fillStyle='white';ct.textAlign='center';ct.font='bold 66px sans-serif';ct.fillText(c.team,128,88);
-    const tex=new T.CanvasTexture(cv);
-    for(const sign of [-1,1]){const tag=new T.Mesh(new T.PlaneGeometry(l*.7,.13),new T.MeshBasicMaterial({map:tex}));tag.position.set(0,.16,sign*(w/2+.002));if(sign<0)tag.rotation.y=Math.PI;group.add(tag);}
+    // A shallow protruding intake with side rails and a bright roller marks the front.
+    const intakeBar=this.box(.22,.08,w*.82,l/2+.11,.13,0,'#d0ed93',group);
+    for(const side of [-1,1])this.box(.23,.11,.035,l/2+.11,.17,side*w*.41,'#748a61',group);
+    const roller=this.cylinder(.045,.045,w*.78,l/2+.2,.19,0,'#efffb5',group);roller.rotation.x=Math.PI/2;
+    const cv=document.createElement('canvas');cv.width=512;cv.height=160;const ct=cv.getContext('2d');
+    ct.fillStyle=color;ct.fillRect(0,0,512,160);ct.fillStyle='#fff';ct.strokeStyle='#111';ct.lineWidth=8;
+    ct.textAlign='center';ct.font='bold 124px sans-serif';ct.strokeText(c.team,256,125);ct.fillText(c.team,256,125);
+    const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;
+    // Large, high-contrast labels on all four bumper faces.
+    for(const sign of [-1,1]){
+      const tag=new T.Mesh(new T.PlaneGeometry(l*.85,.15),new T.MeshBasicMaterial({map:tex}));
+      tag.position.set(0,.16,sign*(w/2+.003));if(sign<0)tag.rotation.y=Math.PI;group.add(tag);
+      const end=new T.Mesh(new T.PlaneGeometry(w*.75,.15),new T.MeshBasicMaterial({map:tex}));
+      end.position.set(sign*(l/2+.003),.16,0);end.rotation.y=sign*Math.PI/2;group.add(end);
+    }
+    // A small number plate on top remains readable from the follow camera.
+    const top=new T.Mesh(new T.PlaneGeometry(l*.50,w*.22),new T.MeshBasicMaterial({map:tex}));
+    top.rotation.x=-Math.PI/2;top.position.set(-l*.12,h+.006,0);group.add(top);
     if(c.archetype==='dumper')for(let lane=0;lane<(c.lanes||1);lane++){
       const offset=laneOffset(lane,c.lanes,w);
       this.box(.018,.055,.08,l/2+.003,h-.07,offset,'#152019',group);

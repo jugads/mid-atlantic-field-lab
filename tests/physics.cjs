@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight}=require('../dist/physics.js');
+const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight,canUseTrench}=require('../dist/physics.js');
 const {profiles,resolve:resolvePreset}=require('../dist/team-presets.js');
 const {ControllerInput,axis}=require('../dist/controller.js');
 let passed=0;
@@ -154,6 +154,24 @@ test('bump height and pitch transition smoothly without snapping',()=>{
  s.updatePose(1/120);const first=s.robot.z;assert(first>0&&first<FIELD.bumpHeight*.5);
  for(let i=0;i<120;i++)s.updatePose(1/120);assert(s.robot.z>first*3);assert(s.robot.pitch>0);
  assert.equal(terrainHeight(b.x-b.width/2,b.y),0);
+});
+test('built-in robots start at a matching trench or bump',()=>{
+ for(const team of ['341','316','1391','8513']){
+   const c=resolvePreset(team),s=new Simulation(c,()=>.5),r=s.robot;
+   assert.equal(r.startArea,team==='8513'?'bump':'trench',team);
+   assert(r.x+c.length/2<=FIELD.startLine+1e-5,team+' starts on the alliance side');
+   if(r.startArea==='trench')assert(Math.abs(r.y-FIELD.trenchWidth/2)<1e-6,team+' should align to the opening');
+   else assert(Math.abs(r.y-(H/2-FIELD.hubSize/2-FIELD.bumpWidth/2))<1e-6,team+' should align to the bump');
+   s.balls=[];s.start();advance(s,1,{right:true});assert(s.robot.x>FIELD.startLine+.5,team+' should be able to leave its start lane');
+ }
+ assert(!canUseTrench({height:FIELD.trenchClearance+.01,width:.8}));
+ assert(!canUseTrench({height:.5,width:FIELD.trenchWidth}));
+});
+test('multiple robot starts use distinct lanes on either alliance',()=>{
+ const s=new Simulation(resolvePreset('341'));assert(s.addRobot(resolvePreset('316')));assert(s.addRobot(resolvePreset('8513')));
+ const blue=s.fleet.map(e=>e.robot.y);assert.equal(new Set(blue).size,3);
+ assert(s.addRobot(resolvePreset('1391','red')));const r=s.robot;
+ assert.equal(r.startArea,'trench');assert(r.x-s.config.length/2>=W-FIELD.startLine-1e-5);assert(Math.abs(r.a-Math.PI)<1e-8);
 });
 test('outside alliance zone, Space ferries fuel to home carpet',()=>{
  const s=empty();s.start();s.time=25;s.inventory=1;s.robot.x=W/2;s.robot.y=H/2-1.65;

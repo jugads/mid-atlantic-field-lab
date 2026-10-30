@@ -30,6 +30,16 @@
     const towardWall=t.alliance==='blue'?-1:1;
     for(const side of [-1,1])for(let i=0;i<8;i++){const f=i/7;solids.push({x:t.x+towardWall*f*.85,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:.13,depth:.045,bottom:.72+f*.38-.025,height:.72+f*.38+.025,tower:true});}
   }
+  // Prefer the trench only when the chassis fits the opening, leaving a little steering room.
+  const canUseTrench=c=>c.height<=FIELD.trenchClearance&&c.width<=FIELD.trenchWidth-.08;
+  function startingLocations(c){
+    const trench=[FIELD.trenchWidth/2,H-FIELD.trenchWidth/2];
+    const bumpOffset=FIELD.hubSize/2+FIELD.bumpWidth/2;
+    const bump=[H/2-bumpOffset,H/2+bumpOffset];
+    return canUseTrench(c)
+      ? [...trench.map(y=>({y,area:'trench'})),...bump.map(y=>({y,area:'bump'})),{y:H/2,area:'center'}]
+      : [...bump.map(y=>({y,area:'bump'})),{y:H/2,area:'center'},...trench.map(y=>({y,area:'trench approach'}))];
+  }
   // The dumper channels are grouped around the center of the chassis.
   const laneOffset=(lane,lanes,width)=>lanes===1?0:(lane/(lanes-1)-.5)*width*.30;
   const ball = (x,y,z=BR) => ({x,y,z,vx:0,vy:0,vz:0,shot:false,checked:false});
@@ -68,10 +78,13 @@
     constructor(config={},random=Math.random){this.config={...base,...config};this.random=random;this.roster=[{...this.config}];this.activeIndex=0;this.reset();}
     reset(){
       this.config={...this.roster[this.activeIndex]};
-      const counts={blue:0,red:0};this.fleet=this.roster.map(config=>{
-        const c={...config},blue=c.alliance==='blue',slot=counts[c.alliance]++;
+      const occupied={blue:[],red:[]};this.fleet=this.roster.map(config=>{
+        const c={...config},blue=c.alliance==='blue',candidates=startingLocations(c),used=occupied[c.alliance];
+        // Reserve separate lanes for each parked robot in a multi-robot simulation.
+        const position=candidates.find(p=>used.every(o=>Math.abs(p.y-o.y)>=(c.width+o.width)/2+.05))||candidates[0];
+        used.push({y:position.y,width:c.width});
         const robot={x:blue?FIELD.startLine-c.length/2:W-FIELD.startLine+c.length/2,
-          y:[H/2-1.65,H/2+1.65,.68][slot%3],a:blue?0:Math.PI,vx:0,vy:0,omega:0,z:0,pitch:0,roll:0};
+          y:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,z:0,pitch:0,roll:0};
         return {config:c,robot,inventory:Math.min(8,c.capacity)};
       });
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
@@ -383,6 +396,6 @@
       if(this.time>=166){this.running=false;r.vx=0;r.vy=0;}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,laneOffset,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,canUseTrench,startingLocations,laneOffset,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);
