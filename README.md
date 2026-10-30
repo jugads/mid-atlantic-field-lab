@@ -15,6 +15,7 @@ node tests/physics.cjs
 - Space: shoot at your hub from your alliance zone; otherwise pass to the marked home-zone landing area.
 - I: toggle intake. Tab: select the next robot. P: pause.
 - Scroll: zoom. Free orbit camera allows dragging.
+- Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, X / Square toggles intake, right bumper switches robots, and Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
 - Menus: Robots adds/selects/removes robots; Settings edits and saves a team build.
 
 AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. Up to six robots, at most three per alliance, can be placed before a match. Only the selected robot is driven; the others remain parked physical obstacles. Builds save per team in browser localStorage under `fma-team-builds-v1`. Reset to edit or add/remove robots.
@@ -36,7 +37,7 @@ Big dumper: fixed, fast chassis-aim shooter with 1–6 parallel lanes. It can sh
 
 ## Physics and geometry
 
-Neutral drive input brakes at three times configured acceleration (minimum 12 m/s²). SI units, 120 Hz base stepping with adaptive contact substeps so high-speed fuel moves less than 0.55 ball radii per substep. Spatially hashed sphere contacts, restitution, gravity, impact/rolling losses, and relative-velocity moving-chassis contacts. Robot footprints use oriented-box contacts. Shot spread depends on range, chassis pitch, and speed. Passing uses ballistic trajectories to an alliance-zone landing target. Fuel and inventory are conserved through capture, capacity changes, scoring and recycling.
+All robot presets default to 5 m/s top speed and 10 m/s² acceleration. Legacy saved builds are migrated to those values in memory; subsequent explicitly saved adjustments are preserved. Neutral drive input brakes at three times configured acceleration (minimum 12 m/s²). SI units, 120 Hz base stepping with adaptive contact substeps so high-speed fuel moves less than 0.55 ball radii per substep. Spatially hashed sphere contacts, restitution, gravity, impact/rolling losses, and relative-velocity moving-chassis contacts. Robot footprints use oriented-box contacts. Shot spread depends on range, chassis pitch, and speed. Passing uses ballistic trajectories to an alliance-zone landing target. Fuel and inventory are conserved through capture, capacity changes, scoring and recycling.
 
 Bumps have sloping faces, approximately 15 degrees, 1.128 m travel depth, 1.854 m width and 0.1654 m crest height. Wheel contact samples raise/pitch/roll the chassis. Trenches have 0.5652 m clearance and 1.279 m usable lane width; tall robots cannot pass. Towers have a traversable base, separate upright, brace and rung collision volumes; rung heights are 0.6858, 1.143 and 1.6002 m. Robots and fuel collide with these structures at their actual modeled heights.
 
@@ -46,6 +47,7 @@ This is a practice simulator, not a full rigid-body FRC digital twin. Tower dept
 
 - `dist/physics.js`: match state, fleet, braking, geometry constants and simulation.
 - `dist/team-presets.js`: permanent, version-controlled user-specified team builds.
+- `dist/controller.js`: standard gamepad mapping, deadzones and edge-triggered actions.
 - `dist/view3d.js`: Three.js models, instanced fuel and camera views.
 - `dist/app.js`: input, menus, team build persistence and HUD.
 - `tests/physics.cjs`: timing, setup, recycling, passing, high-speed contacts, lane rate, tower clearance, fleet and full-match conservation checks.

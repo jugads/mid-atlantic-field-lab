@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight}=require('../dist/physics.js');
 const {profiles,resolve:resolvePreset}=require('../dist/team-presets.js');
+const {ControllerInput,axis}=require('../dist/controller.js');
 let passed=0;
 const test=(name,fn)=>{fn();passed++;console.log('PASS '+name);};
 function advance(s,seconds,input={}){for(let i=0;i<Math.round(seconds*120);i++)s.step(1/120,input);}
@@ -84,6 +85,33 @@ test('0% SOTM profiles miss while moving but still shoot normally when stationar
   const q=stopped.balls[0],distance=Math.hypot(stopped.target.x-stopped.robot.x,stopped.target.y-stopped.robot.y),tf=Math.max(.8,Math.min(1.8,distance/5));
   assert(Math.hypot(q.x+q.vx*tf-stopped.target.x,q.y+q.vy*tf-stopped.target.y)<FIELD.openingRadius,team+' should retain stationary shooting');
  }
+});
+test('all built-in profiles and generic archetypes default to the same drive limits',()=>{
+ for(const team of Object.keys(profiles)){const p=resolvePreset(team);assert.equal(p.maxSpeed,5,team);assert.equal(p.acceleration,10,team);}
+ for(const spec of Object.values(ARCHETYPES)){assert.equal(spec.settings.maxSpeed,5);assert.equal(spec.settings.acceleration,10);}
+});
+test('dumper channels are centered and their launch points match the configured offsets',()=>{
+ const s=empty({...ARCHETYPES.dumper.settings,lanes:4,autoAim:false});s.robot.a=0;s.inventory=8;s.fire();
+ const offsets=s.balls.map(b=>b.y-s.robot.y);assert.equal(offsets.length,4);
+ assert(offsets.every(offset=>Math.abs(offset)<=s.config.width*.15+1e-9));
+ assert(Math.abs(offsets.reduce((a,b)=>a+b,0))<1e-8);
+});
+test('standard controller deadzones, holds, edge buttons and disconnects',()=>{
+ const input=new ControllerInput();assert.equal(axis(.1),0);assert.equal(axis(-1),-1);
+ const pad={index:0,connected:true,mapping:'standard',axes:[.15,-1,.575],buttons:Array.from({length:16},()=>({pressed:false,value:0}))};
+ pad.buttons[0].pressed=true;pad.buttons[2].pressed=true;pad.buttons[5].pressed=true;pad.buttons[9].pressed=true;
+ let a=input.poll([pad]);assert(a.connected&&a.supported&&a.shoot&&a.toggleIntake&&a.switchRobot&&a.startPause);
+ assert.equal(a.x,0);assert.equal(a.y,-1);assert(Math.abs(a.turn-.5)<.001);
+ a=input.poll([pad]);assert(a.shoot);assert(!a.toggleIntake&&!a.switchRobot&&!a.startPause);
+ a=input.poll([pad],true);assert(!a.shoot&&a.turn===0);a=input.poll([pad]);assert(!a.startPause);
+ pad.buttons[9].pressed=false;input.poll([pad]);pad.buttons[9].pressed=true;assert(input.poll([pad]).startPause);
+ assert(!input.poll([]).connected);const unknown=input.poll([{...pad,mapping:''}]);assert(unknown.connected&&!unknown.supported&&!unknown.shoot);
+});
+test('analog controller input provides proportional swerve and tank motion',()=>{
+ const s=empty();s.start();s.time=25;s.robot.x=7;s.robot.y=1;advance(s,1,{moveX:.5,moveY:0,turnAxis:.5});
+ assert(Math.abs(s.robot.vx-2.5)<.05);assert(s.robot.a>1.7&&s.robot.a<1.9);
+ const t=empty({drive:'tank'});t.start();t.time=25;t.robot.x=7;t.robot.y=1;advance(t,.2,{forward:.5,tankTurn:.5});
+ assert(t.robot.a>.3&&t.robot.a<.4);assert(Math.hypot(t.robot.vx,t.robot.vy)>0);
 });
 test('outside alliance zone, Space ferries fuel to home carpet',()=>{
  const s=empty();s.start();s.time=25;s.inventory=1;s.robot.x=W/2;s.robot.y=H/2-1.65;

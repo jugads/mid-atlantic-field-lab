@@ -3,6 +3,7 @@ const {Simulation,base,ARCHETYPES,clamp,FIELD}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),sim=new Simulation(resolvePreset('341')),canvas=$('field'),view=new FieldView(canvas);
 let grid=false,keys=new Set(),last=0,accumulator=0,lastLocked=null;
+const controller=new globalThis.ControllerInput.ControllerInput();
 const schema=[['maxSpeed','Top speed',1,6,.1,'m/s','driveSettings'],['acceleration','Acceleration',1,12,.5,'m/s²','driveSettings'],
  ['width','Width',.55,1.2,.05,'m','driveSettings'],['length','Length',.55,1.2,.05,'m','driveSettings'],['height','Height',.4,.9,.001,'m','driveSettings'],
  ['intakeRate','Intake rate',1,100,1,'fuel/s','fuelSettings'],['feedRate','Feed rate',1,25,1,'fuel/s','fuelSettings'],['capacity','Capacity',1,80,1,'fuel','fuelSettings'],
@@ -14,7 +15,7 @@ function normalize(p){const valid={...base};for(const [id,,min,max]of schema)if(
  valid.archetype=p.archetype==='dumper'?'dumper':'turret';valid.lanes=Math.round(valid.lanes);
  valid.capacity=Math.round(valid.capacity);valid.drive=p.drive==='tank'?'tank':'swerve';valid.alliance=p.alliance==='red'?'red':'blue';valid.autoAim=p.autoAim!==false;
  valid.team=Object.hasOwn(names,p.team)?p.team:'341';return valid;}
-try{const data=JSON.parse(localStorage.getItem('fma-team-builds-v1')||'{}');for(const team of Object.keys(names))if(data[team])builds[team]=normalize({...data[team],team});}catch{}
+try{const data=JSON.parse(localStorage.getItem('fma-team-builds-v1')||'{}');for(const team of Object.keys(names))if(data[team])builds[team]=normalize({...data[team],...(data.__driveDefaultsVersion===2?{}:{maxSpeed:5,acceleration:10}),team});}catch{}
 
 for(const [id,label,min,max,step,unit,group] of schema){
  const row=document.createElement('div');row.className='slider-row';
@@ -51,7 +52,7 @@ for(const id of ['drive','alliance'])$(id).onchange=()=>{
  if(id==='alliance'&&sim.roster.filter((r,i)=>i!==sim.activeIndex&&r.alliance===value).length>=3){$(id).value=sim.config.alliance;$('saveStatus').textContent='That alliance already has three robots.';return;}
  sim.setConfig({[id]:value});reset();};
 $('autoAim').onchange=()=>sim.setConfig({autoAim:$('autoAim').checked});
-$('save').onclick=()=>{try{builds[sim.config.team]=normalize(sim.config);localStorage.setItem('fma-team-builds-v1',JSON.stringify(builds));$('saveStatus').textContent='Saved build to team '+sim.config.team+'.';renderGarage();}catch{$('saveStatus').textContent='Storage unavailable in this browser.';}};
+$('save').onclick=()=>{try{builds[sim.config.team]=normalize(sim.config);localStorage.setItem('fma-team-builds-v1',JSON.stringify({...builds,__driveDefaultsVersion:2}));$('saveStatus').textContent='Saved build to team '+sim.config.team+'.';renderGarage();}catch{$('saveStatus').textContent='Storage unavailable in this browser.';}};
 $('load').onclick=()=>{const saved=builds[sim.config.team];if(!saved){$('saveStatus').textContent='No saved build for this team yet.';return;}sim.setConfig({...saved,alliance:sim.config.alliance});reset();$('saveStatus').textContent='Loaded saved team '+sim.config.team+' build.';};
 $('restorePreset').onclick=()=>{const preset=resolvePreset(sim.config.team,sim.config.alliance);if(!preset)return;sim.setConfig(preset);reset();$('saveStatus').textContent='Loaded built-in team '+sim.config.team+' build.';};
 function openPanel(id){const wasOpen=!$(id).hidden;for(const panel of ['settingsPanel','garagePanel'])$(panel).hidden=true;
@@ -138,10 +139,20 @@ function draw(){
 }
 function frame(now){
  const dt=last?Math.min((now-last)/1000,.1):0;last=now;
+ const blocked=document.hidden||$('helpDialog').open||!$('garagePanel').hidden||!$('settingsPanel').hidden||!document.hasFocus();
+ let pads=[];try{pads=navigator.getGamepads?.()||[];}catch{}
+ const gamepad=controller.poll(pads,blocked);
+ const controllerLabel=gamepad.supported?'CONTROLLER CONNECTED':gamepad.connected?'CONTROLLER NOT STANDARD':'CONTROLLER · CONNECT & PRESS A BUTTON';
+ if($('controllerStatus').textContent!==controllerLabel)$('controllerStatus').textContent=controllerLabel;
+ $('controllerStatus').classList.toggle('connected',gamepad.supported);
+ if(gamepad.startPause){if(!sim.started||sim.phase.id==='finished')$('start').click();else togglePause();}
+ if(gamepad.toggleIntake)$('intake').click();
+ if(gamepad.switchRobot&&sim.fleet.length>1)switchRobot((sim.activeIndex+1)%sim.fleet.length);
  if(sim.running&&!document.hidden){accumulator+=dt;while(accumulator>=1/120){
    const up=keys.has('KeyW'),down=keys.has('KeyS'),left=keys.has('KeyA'),right=keys.has('KeyD');
-   sim.step(1/120,{up,down,left,right,...view.movement(Number(right)-Number(left),Number(down)-Number(up)),
-     clockwise:keys.has('KeyE')||keys.has('ArrowRight'),counterclockwise:keys.has('KeyQ')||keys.has('ArrowLeft'),shoot:keys.has('Space')});
+   const x=clamp(Number(right)-Number(left)+gamepad.x,-1,1),y=clamp(Number(down)-Number(up)+gamepad.y,-1,1);
+   sim.step(1/120,{up,down,left,right,...view.movement(x,y),forward:clamp(Number(up)-Number(down)-gamepad.y,-1,1),tankTurn:gamepad.x,
+     turnAxis:gamepad.turn,clockwise:keys.has('KeyE')||keys.has('ArrowRight'),counterclockwise:keys.has('KeyQ')||keys.has('ArrowLeft'),shoot:keys.has('Space')||gamepad.shoot});
    accumulator-=1/120;
  }}else accumulator=0;
  draw();requestAnimationFrame(frame);

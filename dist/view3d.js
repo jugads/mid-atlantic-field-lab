@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR}=globalThis.FieldPhysics;
+const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset}=globalThis.FieldPhysics;
 export class FieldView {
   constructor(canvas){
     this.canvas=canvas;this.mode='driver';this.theta=0;this.phi=.89;this.distance=20;this.zoom=1;
@@ -134,7 +134,7 @@ export class FieldView {
     const tex=new T.CanvasTexture(cv);
     for(const sign of [-1,1]){const tag=new T.Mesh(new T.PlaneGeometry(l*.7,.13),new T.MeshBasicMaterial({map:tex}));tag.position.set(0,.16,sign*(w/2+.002));if(sign<0)tag.rotation.y=Math.PI;group.add(tag);}
     if(c.archetype==='dumper')for(let lane=0;lane<(c.lanes||1);lane++){
-      const offset=c.lanes===1?0:(lane/(c.lanes-1)-.5)*w*.82;
+      const offset=laneOffset(lane,c.lanes,w);
       this.box(.018,.055,.08,l/2+.003,h-.07,offset,'#152019',group);
     }
     return {body,fill,intakeBar};

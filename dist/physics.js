@@ -2,12 +2,12 @@
 (function (root) {
   const W = 16.54, H = 8.07, G = 9.81, BR = .075;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const base = {maxSpeed:4.5, acceleration:6, width:.85, length:.9, height:.52,
+  const base = {maxSpeed:5, acceleration:10, width:.85, length:.9, height:.52,
     intakeRate:5, feedRate:6, capacity:30, stationary:92, moving:65,
     drive:'swerve', alliance:'blue', autoAim:true, team:'341', autoRoutine:'preload', archetype:'turret',lanes:1};
   const ARCHETYPES = {
-    turret: {label:'Turret',description:'Swiveling shooter · fire while moving',settings:{archetype:'turret',width:.85,length:.9,height:.52,capacity:30,feedRate:6,intakeRate:5,maxSpeed:4.5,acceleration:6,stationary:92,moving:65,lanes:1}},
-    dumper: {label:'Big dumper',description:'Fixed multi-lane shooter · chassis aim · moving accuracy',settings:{archetype:'dumper',width:1,length:1.05,height:.72,capacity:60,feedRate:12,intakeRate:9,maxSpeed:3.8,acceleration:5,stationary:95,moving:40,lanes:3}}
+    turret: {label:'Turret',description:'Swiveling shooter · fire while moving',settings:{archetype:'turret',width:.85,length:.9,height:.52,capacity:30,feedRate:6,intakeRate:5,maxSpeed:5,acceleration:10,stationary:92,moving:65,lanes:1}},
+    dumper: {label:'Big dumper',description:'Fixed multi-lane shooter · chassis aim · moving accuracy',settings:{archetype:'dumper',width:1,length:1.05,height:.72,capacity:60,feedRate:12,intakeRate:9,maxSpeed:5,acceleration:10,stationary:95,moving:40,lanes:3}}
   };
   const FIELD = {hubSize:1.194, hubHeight:1.83, openingRadius:.53,
     bumpDepth:1.128, bumpWidth:1.854, bumpHeight:.1654, trenchClearance:.5652,
@@ -30,6 +30,8 @@
     const towardWall=t.alliance==='blue'?-1:1;
     for(const side of [-1,1])for(let i=0;i<8;i++){const f=i/7;solids.push({x:t.x+towardWall*f*.85,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:.13,depth:.045,bottom:.72+f*.38-.025,height:.72+f*.38+.025,tower:true});}
   }
+  // The dumper channels are grouped around the center of the chassis.
+  const laneOffset=(lane,lanes,width)=>lanes===1?0:(lane/(lanes-1)-.5)*width*.30;
   const ball = (x,y,z=BR) => ({x,y,z,vx:0,vy:0,vz:0,shot:false,checked:false});
   const PHASES = [
     {id:'auto',label:'AUTO',start:0,end:20,active:'both'},
@@ -179,7 +181,7 @@
       const startLane=limit===1&&lanes>1?Math.floor(this.random()*lanes):0;
       for(let i=0;i<count;i++){
         const lane=(startLane+i)%lanes;
-        const offset=lanes===1?0:(lane/(lanes-1)-.5)*c.width*.82;
+        const offset=laneOffset(lane,lanes,c.width);
         const ox=r.x-Math.sin(r.a)*offset,oy=r.y+Math.cos(r.a)*offset;
         const ex=gaussian()*sigma*(.7+d/5),ey=gaussian()*sigma*(.7+d/5);
         let vx=(h.x-ox+ex)/t,vy=(h.y-oy+ey)/t;
@@ -223,8 +225,8 @@
     drive(dt,input){
       const c=this.config,r=this.robot;let x=input.moveX??((input.right?1:0)-(input.left?1:0)),
         y=input.moveY??((input.down?1:0)-(input.up?1:0));
-      let turn=(input.clockwise?1:0)-(input.counterclockwise?1:0);
-      if(c.drive==='tank'){turn+=(input.right?1:0)-(input.left?1:0);const f=(input.up?1:0)-(input.down?1:0);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
+      let turn=clamp(((input.clockwise?1:0)-(input.counterclockwise?1:0))+(input.turnAxis||0),-1,1);
+      if(c.drive==='tank'){turn=clamp(turn+(input.right?1:0)-(input.left?1:0)+(input.tankTurn||0),-1,1);const f=clamp(input.forward??((input.up?1:0)-(input.down?1:0)),-1,1);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
       r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
       const onBump=r.z>.008||terrainHeight(r.x,r.y)>0,max=c.maxSpeed*(onBump?.65:1);
       // Brake much harder when the stick is neutral; commanded acceleration is unchanged.
@@ -281,7 +283,7 @@
       if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;}
       this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
-      if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise){
+      if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise&&Math.abs(control.turnAxis||0)<.01&&Math.abs(control.tankTurn||0)<.01){
         const error=Math.atan2(Math.sin(this.aimAngle-r.a),Math.cos(this.aimAngle-r.a));
         const rotation=clamp(error,-12*dt,12*dt);r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose();
       }
@@ -340,6 +342,6 @@
       if(this.time>=166){this.running=false;r.vx=0;r.vy=0;}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,laneOffset,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);
