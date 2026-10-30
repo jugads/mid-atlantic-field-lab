@@ -18,7 +18,7 @@ node tests/physics.cjs
 - Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, X / Square toggles intake; on the pre-match screen the D-pad selects a robot and A / Cross starts; after a match A returns to the picker. Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
 - Before starting, choose a built-in team on the selection screen. The match uses one robot; reset to choose another. Robots that fit the trench begin at its entrance; taller or wider robots start next to a bump. The protruding green intake marks the front.
 
-AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. The interface offers the four built-in team profiles; selecting another robot requires resetting the match. Existing locally saved builds are left in browser storage but are not shown in the selection screen.
+A three-second 3–2–1 countdown runs before AUTO starts, with pause and reset support. AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. The interface offers the four built-in team profiles; selecting another robot requires resetting the match. Existing locally saved builds are left in browser storage but are not shown in the selection screen.
 
 ## Robot archetypes
 
@@ -48,6 +48,7 @@ This is a practice simulator, not a full rigid-body FRC digital twin. Tower dept
 - `dist/physics.js`: match state, fleet, braking, geometry constants and simulation.
 - `dist/team-presets.js`: permanent, version-controlled user-specified team builds.
 - `dist/controller.js`: standard gamepad mapping, deadzones and edge-triggered actions.
+- `dist/countdown.js`: pausable pre-match countdown.
 - `dist/view3d.js`: Three.js models, instanced fuel and camera views.
 - `dist/app.js`: pre-match robot selection, input and HUD.
 - `tests/physics.cjs`: timing, setup, recycling, passing, high-speed contacts, lane rate, tower clearance, fleet and full-match conservation checks.

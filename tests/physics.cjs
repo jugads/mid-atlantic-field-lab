@@ -2,6 +2,7 @@ const assert=require('node:assert/strict');
 const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight,canUseTrench}=require('../dist/physics.js');
 const {profiles,resolve:resolvePreset}=require('../dist/team-presets.js');
 const {ControllerInput,axis}=require('../dist/controller.js');
+const {Countdown}=require('../dist/countdown.js');
 let passed=0;
 const test=(name,fn)=>{fn();passed++;console.log('PASS '+name);};
 function advance(s,seconds,input={}){for(let i=0;i<Math.round(seconds*120);i++)s.step(1/120,input);}
@@ -13,6 +14,13 @@ test('504 fuel with centered pile, depot fuel and outpost reserves',()=>{
  assert(s.balls.slice(0,400).every(b=>Math.abs(b.x-W/2)<FIELD.centerDepth/2&&Math.abs(b.y-H/2)<FIELD.centerWidth/2));
  assert(s.balls.slice(0,400).every(b=>Math.abs(b.x-W/2)>BR+.025));assert.equal(s.balls.length-400,48);
  const low=new Simulation({capacity:1});assert.equal(low.initialCenterCount,407);assert.equal(total(low),504);
+});
+test('three-second countdown pauses, resumes, completes once, and can reset',()=>{
+ const c=new Countdown(3);assert(!c.active);assert(c.start());assert(!c.start());
+ assert.equal(c.remaining,3);assert(!c.advance(1));assert.equal(c.remaining,2);
+ assert(c.togglePause());assert(!c.advance(50));assert.equal(c.remaining,2);
+ assert(c.togglePause());assert(!c.advance(1.9));assert(c.advance(.1));assert(!c.active);assert(!c.advance(1));
+ assert(c.start());c.advance(.5);c.cancel();assert(!c.active);assert.equal(c.remaining,0);
 });
 test('ready state freezes physics; AUTO remains driver-controlled',()=>{
  const s=empty(),x=s.robot.x,a=s.robot.a;s.step(1,{right:true});assert.equal(s.time,0);
