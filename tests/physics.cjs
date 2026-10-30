@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict');
-const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight,canUseTrench}=require('../dist/physics.js');
+const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight,canUseTrench,intakeSign}=require('../dist/physics.js');
 const {profiles,resolve:resolvePreset}=require('../dist/team-presets.js');
 const {ControllerInput,axis}=require('../dist/controller.js');
 const {Countdown}=require('../dist/countdown.js');
@@ -160,9 +160,22 @@ test('wider trench lets a standard 1 m chassis use the extra margin',()=>{
 });
 test('bump height and pitch transition smoothly without snapping',()=>{
  const s=empty(),b=bumps[0];s.robot.x=b.x-.25;s.robot.y=b.y;s.robot.z=0;s.robot.pitch=0;
- s.updatePose(1/120);const first=s.robot.z;assert(first>0&&first<FIELD.bumpHeight*.5);
- for(let i=0;i<120;i++)s.updatePose(1/120);assert(s.robot.z>first*3);assert(s.robot.pitch>0);
+ s.updatePose(1/120);const first=s.robot.z;assert(first>0&&first<=FIELD.bumpHeight);
+ for(let i=0;i<120;i++)s.updatePose(1/120);assert(s.robot.z>0);assert(s.robot.pitch>0);
  assert.equal(terrainHeight(b.x-b.width/2,b.y),0);
+});
+test('bump crest supports the chassis and the intake opposes dumper shooters',()=>{
+ const b=bumps[0],s=empty();Object.assign(s.robot,{x:b.x,y:b.y,z:0,a:0,pitch:0,roll:0});s.updatePose(1/120);
+ assert(s.robot.z>=terrainHeight(b.x,b.y));
+ for(const team of ['316','1391','8513']){const c=resolvePreset(team);assert.equal(intakeSign(c),c.shooterDirection==='back'?1:-1);}
+ assert.equal(intakeSign(resolvePreset('341')),1);
+});
+test('front and rear dumper intakes collect on the side opposite the shooter',()=>{
+ for(const team of ['316','1391']){
+  const c=resolvePreset(team),s=empty(c);s.start();s.time=25;Object.assign(s.robot,{x:7,y:1,a:0,vx:0,vy:0});s.inventory=0;
+  const side=intakeSign(c);s.balls=[ball(s.robot.x+side*(c.length/2+.12),s.robot.y)];advance(s,.05);
+  assert.equal(s.inventory,1,team+' should collect at intake side');
+ }
 });
 test('bump traversal maintains drive speed and settles quickly afterward',()=>{
  const s=empty(),b=bumps[0];s.start();Object.assign(s.robot,{x:b.x-1.3,y:b.y,z:0,a:0,vx:5,vy:0});

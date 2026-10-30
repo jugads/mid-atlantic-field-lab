@@ -41,6 +41,7 @@
       : [...bump.map(y=>({y,area:'bump'})),{y:H/2,area:'center'},...trench.map(y=>({y,area:'trench approach'}))];
   }
   // The dumper channels are grouped around the center of the chassis.
+  const intakeSign=c=>c.archetype==='dumper'&&c.shooterDirection!=='back'?-1:1;
   const laneOffset=(lane,lanes,width)=>lanes===1?0:(lane/(lanes-1)-.5)*width*.30;
   const ball = (x,y,z=BR) => ({x,y,z,vx:0,vy:0,vz:0,shot:false,checked:false});
   const PHASES = [
@@ -193,10 +194,13 @@
     updatePose(dt=0){const r=this.robot,c=this.config,ca=Math.cos(r.a),sa=Math.sin(r.a),l=c.length*.34,w=c.width*.34;
       const fl=terrainHeight(r.x+ca*l-sa*w,r.y+sa*l+ca*w),fr=terrainHeight(r.x+ca*l+sa*w,r.y+sa*l-ca*w),
         bl=terrainHeight(r.x-ca*l-sa*w,r.y-sa*l+ca*w),br=terrainHeight(r.x-ca*l+sa*w,r.y-sa*l-ca*w);
-      const height=(fl+fr+bl+br)/4,pitch=Math.atan2((fl+fr-bl-br)/2,2*l),roll=Math.atan2((fl+bl-fr-br)/2,2*w);
-      // Follow the wheel heights quickly enough to stay grounded at full driving speed.
-      const alpha=dt>0?1-Math.exp(-32*dt):1;
-      r.z+=(height-r.z)*alpha;r.pitch+=(pitch-r.pitch)*alpha;r.roll+=(roll-r.roll)*alpha;
+      const pitch=Math.atan2((fl+fr-bl-br)/2,2*l),roll=Math.atan2((fl+bl-fr-br)/2,2*w);
+      // The chassis follows the wheel slopes, with enough lift to clear the bump crest.
+      const alpha=dt>0?1-Math.exp(-24*dt):1;
+      r.pitch+=(pitch-r.pitch)*alpha;r.roll+=(roll-r.roll)*alpha;
+      const p=Math.tan(r.pitch)*l,q=Math.tan(r.roll)*w;
+      const support=Math.max(terrainHeight(r.x,r.y),fl-p-q,fr-p+q,bl+p-q,br+p+q,0);
+      r.z=Math.max(support,r.z+(support-r.z)*alpha);
     }
     fire(limit=Infinity){
       if(!this.inventory||this.fireStatus==='ALIGNING CHASSIS')return 0;
@@ -378,7 +382,7 @@
         if(b.z<r.z+c.height&&(b.launchTime===undefined||this.time-b.launchTime>.15)){const ca=Math.cos(r.a),sa=Math.sin(r.a),dx=b.x-r.x,dy=b.y-r.y,
           forward=dx*ca+dy*sa,side=-dx*sa+dy*ca;
           if(this.controlsEnabled&&this.intake&&this.inventory<c.capacity&&this.intakeClock<=1e-8&&
-            b.z<r.z+.3&&forward>c.length/2-.1&&forward<c.length/2+.3&&Math.abs(side)<c.width/2+.04){
+            b.z<r.z+.3&&forward*intakeSign(c)>c.length/2-.1&&forward*intakeSign(c)<c.length/2+.3&&Math.abs(side)<c.width/2+.04){
             this.inventory++;this.intakeClock+=1/c.intakeRate;continue;}
           // Resolve in the moving contact frame; add its velocity back exactly once.
           const pointVx=r.vx-r.omega*dy,pointVy=r.vy+r.omega*dx;
@@ -404,6 +408,6 @@
       if(this.time>=166){this.running=false;r.vx=0;r.vy=0;}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,canUseTrench,startingLocations,laneOffset,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,canUseTrench,startingLocations,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);

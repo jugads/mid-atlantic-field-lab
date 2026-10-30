@@ -1,5 +1,5 @@
 import * as T from './vendor/three.module.js';
-const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset}=globalThis.FieldPhysics;
+const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset,intakeSign}=globalThis.FieldPhysics;
 export class FieldView {
   constructor(canvas){
     this.canvas=canvas;this.mode='follow';this.theta=0;this.phi=.89;this.distance=20;this.zoom=1;
@@ -128,10 +128,10 @@ export class FieldView {
     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(l*.89,h-.22,w*.89)),new T.LineBasicMaterial({color:'#c4cbb4',transparent:true,opacity:.45}));
     outline.position.y=.23+(h-.22)/2;group.add(outline);
     const fill=this.box(l*.83,1,w*.83,0,.23,0,'#e4c646',group);fill.castShadow=false;
-    // A modest roller and two short side rails identify the intake end.
-    const intakeBar=this.box(.14,.07,w*.7,l/2+.07,.14,0,'#c8a5ff',group);
-    for(const side of [-1,1])this.box(.14,.08,.025,l/2+.07,.16,side*w*.35,'#a59bb0',group);
-    const roller=this.cylinder(.035,.035,w*.66,l/2+.13,.18,0,'#e6dcef',group);roller.rotation.x=Math.PI/2;
+    // A subtle translucent extension shows the intake side of the hopper.
+    const intakeSide=intakeSign(c),intakeHeight=Math.max(.12,(h-.23)*.55);
+    const intakeBar=this.box(.18,intakeHeight,w*.70,intakeSide*(l*.44+.09),.23+intakeHeight/2,0,'#c8a5ff',group);
+    intakeBar.material.transparent=true;intakeBar.material.opacity=.35;intakeBar.material.depthWrite=false;
     const cv=document.createElement('canvas');cv.width=512;cv.height=160;const ct=cv.getContext('2d');
     ct.fillStyle=color;ct.fillRect(0,0,512,160);ct.fillStyle='#fff';ct.strokeStyle='#111';ct.lineWidth=8;
     ct.textAlign='center';ct.font='bold 124px sans-serif';ct.strokeText(c.team,256,125);ct.fillText(c.team,256,125);
@@ -142,10 +142,14 @@ export class FieldView {
     const shooter=new T.Group();group.add(shooter);
     const back=c.shooterDirection==='back',direction=back?-1:1;
     shooter.position.set(c.archetype==='dumper'?direction*l*.30:0,h+.025,0);
-    this.box(.18,.09,w*.32,0,.045,0,'#a99bb8',shooter);
-    if(c.archetype==='dumper')for(let lane=0;lane<(c.lanes||1);lane++){
-      this.box(.12,.055,.055,direction*.12,.055,laneOffset(lane,c.lanes,w),'#eee7f5',shooter);
-    }else this.box(.18,.06,.09,.15,.06,0,'#eee7f5',shooter);
+    if(c.archetype==='dumper'){
+      // One compact housing with a dark outlet, centered across the configured lanes.
+      this.box(.22,.11,w*.36,0,.055,0,'#77717e',shooter);
+      this.box(.012,.052,w*.28,direction*.116,.065,0,'#29252f',shooter);
+    }else{
+      const base=this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
+      this.box(.20,.07,.10,.15,.07,0,'#aaa2b1',shooter);
+    }
     return {body,fill,intakeBar,shooter};
   }
   updateFill(visual,config,inventory){
@@ -170,7 +174,7 @@ export class FieldView {
     const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
-    this.chassis.rotation.set(r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
+    this.chassis.rotation.set(-r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
     const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:sim.shooterAngle;this.updateFill(this.activeVisual,c,sim.inventory);
     if(c.archetype==='turret')this.activeVisual.shooter.rotation.y=-(aim-r.a);
     const parkedKeys=new Set();
@@ -179,7 +183,7 @@ export class FieldView {
       const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection].join('|');
       let visual=this.parkedVisuals.get(index);
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
-      visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
+      visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(-pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
     });
     for(const [index,visual] of this.parkedVisuals)if(!parkedKeys.has(index)){this.disposeGroup(visual.group);this.scene.remove(visual.group);this.parkedVisuals.delete(index);}
     this.fuel.count=sim.balls.length;

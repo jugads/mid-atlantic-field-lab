@@ -1,4 +1,4 @@
-import {FieldView} from './view3d.js?v=shooter1';
+import {FieldView} from './view3d.js?v=bumps2';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
