@@ -108,7 +108,8 @@ export class FieldView {
       this.box(.69,.015,1.07,dx,.012,depotZ,'#5d6152');
       for(const dz of [-.535,.535])this.box(.69,.029,.025,dx,.026,depotZ+dz,color);
       this.label('DEPOT · 24',dx+direction*.9,depotZ,'#aebca6',.3);
-      const outZ=-depotZ;this.box(.34,.8,.55,tx,.4,outZ,'#303a34');this.label('OUTPOST · 24',tx+direction*.9,outZ,'#aebca6',.28);
+      // Outpost fuel stays in reserve off-field; do not draw a placeholder block on the carpet.
+      const outZ=-depotZ;this.label('OUTPOST · 24',tx+direction*.9,outZ,'#aebca6',.28);
     }
     // Thin staging footprint makes the compact two-sided center pile easy to read before AUTO.
     const sd=FIELD.centerDepth,sw=FIELD.centerWidth;

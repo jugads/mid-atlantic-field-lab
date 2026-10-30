@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id),sim=new Simulation(),canvas=$('field'),v
 let grid=false,keys=new Set(),last=0,accumulator=0,lastLocked=null;
 const schema=[['maxSpeed','Top speed',1,6,.1,'m/s','driveSettings'],['acceleration','Acceleration',1,12,.5,'m/s²','driveSettings'],
  ['width','Width',.55,1.2,.05,'m','driveSettings'],['length','Length',.55,1.2,.05,'m','driveSettings'],['height','Height',.4,.9,.01,'m','driveSettings'],
- ['intakeRate','Intake rate',1,25,1,'fuel/s','fuelSettings'],['feedRate','Feed rate',1,25,1,'fuel/s','fuelSettings'],['capacity','Capacity',1,80,1,'fuel','fuelSettings'],
+ ['intakeRate','Intake rate',1,100,1,'fuel/s','fuelSettings'],['feedRate','Feed rate',1,25,1,'fuel/s','fuelSettings'],['capacity','Capacity',1,80,1,'fuel','fuelSettings'],
  ['lanes','Shooter lanes',1,6,1,'lanes','shootSettings'],['stationary','Stationary accuracy',10,100,1,'%','shootSettings'],['moving','Moving accuracy',0,100,1,'%','shootSettings']];
 const names={'341':'Miss Daisy','1640':'Sab-BOT-age','2590':'Nemesis','2539':'Krypton Cougars','1403':'Cougar Robotics','2607':'The Fighting RoboVikings','1218':'SCH Robotics','1923':'The MidKnight Inventors','1676':'The Pascack PI-oneers','365':'Miracle Workerz'};
 for(const id of ['team','addTeam'])for(const [number,name]of Object.entries(names)){$(id).add(new Option(number+' · '+name,number));}

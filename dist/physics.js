@@ -76,7 +76,7 @@
       const c=this.config;
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
       this.fired=0;this.passed=0;this.resolved=0;this.made=0;this.inactiveMade=0;this.recycled=0;this.time=0;
-      this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;
+      this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
       this.autoWinner=null;this.tieChoice=this.random()<.5?'blue':'red';this.balls=[];this.pending=[];this.flashes=[];
       this.outpostReserve={blue:24,red:24};
       // Six-robot preloads not used by this single-robot session return to the neutral pile.
@@ -140,7 +140,7 @@
     switchRobot(index){
       if(index<0||index>=this.fleet.length||index===this.activeIndex)return;
       this.saveActive();this.activeIndex=index;const entry=this.fleet[index];this.config={...entry.config};this.robot=entry.robot;
-      this.inventory=entry.inventory;this.robot.vx=0;this.robot.vy=0;this.robot.omega=0;this.fireClock=0;this.feedBudget=0;this.intakeClock=0;this.score=this.scores[this.config.alliance];
+      this.inventory=entry.inventory;this.robot.vx=0;this.robot.vy=0;this.robot.omega=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;this.intakeClock=0;this.score=this.scores[this.config.alliance];
     }
     addRobot(config){
       if(this.started||this.roster.length>=6)return false;
@@ -167,7 +167,7 @@
         bl=terrainHeight(r.x-ca*l-sa*w,r.y-sa*l+ca*w),br=terrainHeight(r.x-ca*l+sa*w,r.y-sa*l-ca*w);
       r.z=(fl+fr+bl+br)/4;r.pitch=Math.atan2((fl+fr-bl-br)/2,2*l);r.roll=Math.atan2((fl+bl-fr-br)/2,2*w);
     }
-    fire(){
+    fire(limit=Infinity){
       if(!this.inventory||this.fireStatus==='ALIGNING CHASSIS')return 0;
       const r=this.robot,c=this.config,h=this.shotTarget,passing=!this.inAllianceZone;
       const d=Math.hypot(h.x-r.x,h.y-r.y),launch=r.z+c.height-.05,
@@ -175,8 +175,10 @@
       const accuracy=(c.stationary+(c.moving-c.stationary)*clamp(speed/c.maxSpeed,0,1))/100;
       const sigma=(passing?.06:.025)+(1-accuracy)*(passing?.45:1.1)+Math.abs(r.pitch)*.3;
       const gaussian=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,this.random())))*Math.cos(2*Math.PI*this.random());
-      const lanes=c.archetype==='dumper'?Math.max(1,Math.round(c.lanes||1)):1,count=Math.min(lanes,this.inventory);
-      for(let lane=0;lane<count;lane++){
+      const lanes=c.archetype==='dumper'?Math.max(1,Math.round(c.lanes||1)):1,count=Math.min(lanes,this.inventory,limit);
+      const startLane=limit===1&&lanes>1?Math.floor(this.random()*lanes):0;
+      for(let i=0;i<count;i++){
+        const lane=(startLane+i)%lanes;
         const offset=lanes===1?0:(lane/(lanes-1)-.5)*c.width*.82;
         const ox=r.x-Math.sin(r.a)*offset,oy=r.y+Math.cos(r.a)*offset;
         const ex=gaussian()*sigma*(.7+d/5),ey=gaussian()*sigma*(.7+d/5);
@@ -268,16 +270,19 @@
       const c=this.config,r=this.robot,auto=this.time<20;
       const control=this.controlsEnabled?input:{};
       if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;}
-      this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(0,this.intakeClock-dt);
+      this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
       if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise){
         const error=Math.atan2(Math.sin(this.aimAngle-r.a),Math.cos(this.aimAngle-r.a));
         const rotation=clamp(error,-12*dt,12*dt);r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose();
       }
-      const volley=c.archetype==='dumper'?Math.max(1,Math.round(c.lanes||1)):1;
-      this.feedBudget=wantsFire?Math.min(volley,this.feedBudget+dt*c.feedRate):0;
-      if(wantsFire&&this.inventory&&this.feedBudget+1e-8>=Math.min(volley,this.inventory)){
-        const released=this.fire();if(released)this.feedBudget=Math.max(0,this.feedBudget-released);
+      // The configured rate is the average total output across all lanes. Dumpers
+      // emit individual balls with ±15% interval variation instead of synchronized volleys.
+      this.feedBudget=wantsFire?Math.min(1.5,this.feedBudget+dt*c.feedRate):0;
+      if(wantsFire&&this.inventory&&this.feedBudget+1e-8>=this.feedThreshold){
+        const released=this.fire(1);
+        if(released){this.feedBudget=Math.max(0,this.feedBudget-this.feedThreshold);
+          this.feedThreshold=c.archetype==='dumper'?.85+this.random()*.3:1;}
       }
       this.releaseFuel();const kept=[];
       for(const b of this.balls){
@@ -301,7 +306,7 @@
           forward=dx*ca+dy*sa,side=-dx*sa+dy*ca;
           if(this.controlsEnabled&&this.intake&&this.inventory<c.capacity&&this.intakeClock<=1e-8&&
             b.z<r.z+.3&&forward>c.length/2-.1&&forward<c.length/2+.3&&Math.abs(side)<c.width/2+.04){
-            this.inventory++;this.intakeClock=1/c.intakeRate;continue;}
+            this.inventory++;this.intakeClock+=1/c.intakeRate;continue;}
           // Resolve in the moving contact frame; add its velocity back exactly once.
           const pointVx=r.vx-r.omega*dy,pointVy=r.vy+r.omega*dx;
           const rvx=b.vx-pointVx,rvy=b.vy-pointVy;

@@ -23,7 +23,7 @@ AUTO is deliberately driver-controlled, per the user's request. No autonomous ro
 
 Turret: independent swivel aim and motion compensation.
 
-Big dumper: fixed, fast chassis-aim shooter with 1–6 parallel lanes. It can shoot while moving; the moving-accuracy slider controls dispersion. A lane volley shares the configured total feed rate. Five lanes at 25 fuel/s produce five-ball volleys at five volleys/second, not 125 fuel/s. Feed and intake limits are 25 fuel/s. Both chassis styles use generic boxes with yellow fill increasing in height and intensity with inventory.
+Big dumper: fixed, fast chassis-aim shooter with 1–6 parallel lanes. It can shoot while moving; the moving-accuracy slider controls dispersion. Dumper lanes emit fuel individually, with slightly irregular intervals averaging the configured total feed rate. Five lanes at 25 fuel/s share an average total of 25 fuel/s, not 125 fuel/s. Feed rate is adjustable up to 25 fuel/s and intake rate up to 100 fuel/s. Both chassis styles use generic boxes with yellow fill increasing in height and intensity with inventory.
 
 ## Match behavior
 

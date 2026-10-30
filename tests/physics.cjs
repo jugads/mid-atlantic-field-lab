@@ -78,6 +78,26 @@ test('25 BPS is shared across lanes, not multiplied by their number',()=>{
  const s=empty({...ARCHETYPES.dumper.settings,lanes:5,feedRate:25,capacity:80,autoAim:false});s.start();s.time=25;s.inventory=80;
  advance(s,1,{shoot:true});assert(s.fired>=24&&s.fired<=25,`fired ${s.fired}`);
 });
+test('dumper feed intervals vary while preserving the configured average across lanes',()=>{
+ let seed=913;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
+ const s=new Simulation({...ARCHETYPES.dumper.settings,feedRate:25,lanes:5,capacity:1000,autoAim:false},random);
+ s.balls=[];s.inventory=1000;s.start();s.time=25;const times=[],lanes=[];
+ for(let i=0;i<1200;i++){
+   const before=s.fired;s.step(1/120,{shoot:true});
+   if(s.fired>before){times.push(s.time);lanes.push(s.balls[s.balls.length-1].lane);}
+   s.balls=[];
+ }
+ const intervals=times.slice(1).map((time,i)=>Math.round((time-times[i])*1000));
+ assert(times.length>=245&&times.length<=255,`10 seconds produced ${times.length} balls`);
+ assert(new Set(intervals).size>=2,'expected varied shot timing');
+ assert(new Set(lanes).size===5,'expected all lanes to fire');
+});
+test('a 100 fuel/s intake can collect well above the old 25 fuel/s limit',()=>{
+ const s=empty({intakeRate:100,capacity:80});s.start();s.robot.x=2;s.robot.y=2;s.inventory=0;
+ // Isolate intake cadence from ball-to-ball scattering: fuel is continuously available at the mouth.
+ s.balls=Array.from({length:50},()=>ball(2+s.config.length/2+.15,2));s.collideFuel=()=>{};
+ advance(s,.2);assert(s.inventory>=18,`collected ${s.inventory} in 0.2 seconds`);
+});
 test('high-speed fuel contacts do not tunnel through each other',()=>{
  const s=empty();s.start();s.time=25;s.balls=[{...ball(7.8,1,.3),vx:80},{...ball(8.2,1,.3),vx:-80}];
  const energy=80*80*2;s.step(1/120);assert(s.balls[0].vx<0);assert(s.balls[1].vx>0);
