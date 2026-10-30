@@ -100,9 +100,11 @@ test('standard controller deadzones, holds, edge buttons and disconnects',()=>{
  const input=new ControllerInput();assert.equal(axis(.1),0);assert.equal(axis(-1),-1);
  const pad={index:0,connected:true,mapping:'standard',axes:[.15,-1,.575],buttons:Array.from({length:16},()=>({pressed:false,value:0}))};
  pad.buttons[0].pressed=true;pad.buttons[2].pressed=true;pad.buttons[5].pressed=true;pad.buttons[9].pressed=true;
- let a=input.poll([pad]);assert(a.connected&&a.supported&&a.shoot&&a.toggleIntake&&a.switchRobot&&a.startPause);
+ let a=input.poll([pad]);assert(a.connected&&a.supported&&a.shoot&&a.confirm&&a.toggleIntake&&a.switchRobot&&a.startPause);
  assert.equal(a.x,0);assert.equal(a.y,-1);assert(Math.abs(a.turn-.5)<.001);
- a=input.poll([pad]);assert(a.shoot);assert(!a.toggleIntake&&!a.switchRobot&&!a.startPause);
+ a=input.poll([pad]);assert(a.shoot);assert(!a.confirm&&!a.toggleIntake&&!a.switchRobot&&!a.startPause);
+ pad.buttons[14].pressed=true;assert(input.poll([pad]).previousChoice);assert(!input.poll([pad]).previousChoice);
+ pad.buttons[14].pressed=false;pad.buttons[15].pressed=true;assert(input.poll([pad]).nextChoice);
  a=input.poll([pad],true);assert(!a.shoot&&a.turn===0);a=input.poll([pad]);assert(!a.startPause);
  pad.buttons[9].pressed=false;input.poll([pad]);pad.buttons[9].pressed=true;assert(input.poll([pad]).startPause);
  assert(!input.poll([]).connected);const unknown=input.poll([{...pad,mapping:''}]);assert(unknown.connected&&!unknown.supported&&!unknown.shoot);

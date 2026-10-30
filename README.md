@@ -13,12 +13,12 @@ node tests/physics.cjs
 - WASD: camera-relative swerve movement; W/S forward/back and A/D turn for tank.
 - Left/Right arrows or Q/E: turn the chassis.
 - Space: shoot at your hub from your alliance zone; otherwise pass to the marked home-zone landing area.
-- I: toggle intake. Tab: select the next robot. P: pause.
+- I: toggle intake. P: pause. R: reset the match and choose a different robot.
 - Scroll: zoom. Free orbit camera allows dragging.
-- Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, X / Square toggles intake, right bumper switches robots, and Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
-- Menus: Robots adds/selects/removes robots; Settings edits and saves a team build.
+- Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, X / Square toggles intake; on the pre-match screen the D-pad selects a robot and A / Cross starts; after a match A returns to the picker. Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
+- Before starting, choose a built-in team on the selection screen. The match uses one robot; reset to choose another.
 
-AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. Up to six robots, at most three per alliance, can be placed before a match. Only the selected robot is driven; the others remain parked physical obstacles. Builds save per team in browser localStorage under `fma-team-builds-v1`. Reset to edit or add/remove robots.
+AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. The interface offers the four built-in team profiles; selecting another robot requires resetting the match. Existing locally saved builds are left in browser storage but are not shown in the selection screen.
 
 ## Robot archetypes
 
@@ -49,7 +49,7 @@ This is a practice simulator, not a full rigid-body FRC digital twin. Tower dept
 - `dist/team-presets.js`: permanent, version-controlled user-specified team builds.
 - `dist/controller.js`: standard gamepad mapping, deadzones and edge-triggered actions.
 - `dist/view3d.js`: Three.js models, instanced fuel and camera views.
-- `dist/app.js`: input, menus, team build persistence and HUD.
+- `dist/app.js`: pre-match robot selection, input and HUD.
 - `tests/physics.cjs`: timing, setup, recycling, passing, high-speed contacts, lane rate, tower clearance, fleet and full-match conservation checks.
 
 References:
