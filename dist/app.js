@@ -7,7 +7,7 @@ const controller=new globalThis.ControllerInput.ControllerInput();
 const schema=[['maxSpeed','Top speed',1,6,.1,'m/s','driveSettings'],['acceleration','Acceleration',1,12,.5,'m/s²','driveSettings'],
  ['width','Width',.55,1.2,.05,'m','driveSettings'],['length','Length',.55,1.2,.05,'m','driveSettings'],['height','Height',.4,.9,.001,'m','driveSettings'],
  ['intakeRate','Intake rate',1,100,1,'fuel/s','fuelSettings'],['feedRate','Feed rate',1,25,1,'fuel/s','fuelSettings'],['capacity','Capacity',1,80,1,'fuel','fuelSettings'],
- ['lanes','Shooter lanes',1,6,1,'lanes','shootSettings'],['stationary','Stationary accuracy',10,100,1,'%','shootSettings'],['moving','Moving accuracy',0,100,1,'%','shootSettings']];
+ ['maxRange','Scoring range',1,10,.1,'m','shootSettings'],['lanes','Shooter lanes',1,6,1,'lanes','shootSettings'],['stationary','Stationary accuracy',10,100,1,'%','shootSettings'],['moving','Moving accuracy',0,100,1,'%','shootSettings']];
 for(const id of ['team','addTeam'])for(const [number,name]of Object.entries(names)){$(id).add(new Option(number+' · '+name,number));}
 $('addTeam').value='1640';
 let builds={};
@@ -122,9 +122,9 @@ function updateMatch(){
  else if(finished)overlay.innerHTML=`<strong>MATCH COMPLETE</strong><span>Blue ${sim.scores.blue} — ${sim.scores.red} Red · ${sim.recycled} fuel returned to center</span>`;
  else if(paused)overlay.innerHTML='<strong>MATCH PAUSED</strong><span>Press P or Resume to continue.</span>';
  $('hint').textContent=ready?'WASD drive · ← → turn · Space shoot · Scroll to zoom':paused?'Clock and physics paused':p.id==='auto'?'AUTO · Driver-controlled · Both hubs active':p.id==='auto-settle'||p.id==='final-settle'?'Driver input disabled · Waiting for airborne fuel to settle':finished?'Reset or start a new match':
-   (!sim.inAllianceZone?'PASS MODE · Hold Space to ferry fuel into your alliance zone':sim.config.archetype==='dumper'?'BIG DUMPER · Hold Space for fast aim and multi-lane fire':sim.activeAt(sim.config.alliance)?'YOUR HUB IS ACTIVE · Turret can shoot while moving':'YOUR HUB IS INACTIVE · Collect fuel for your next shift');
- $('shotMode').textContent=(sim.shotMode==='pass'?'↶ PASS TO HOME':'◎ SHOOT HUB')+' · '+(sim.config.archetype==='dumper'?sim.fireStatus:'SWIVEL TURRET');
- $('shotMode').classList.toggle('passing',sim.shotMode==='pass');
+   (!sim.inAllianceZone?'PASS MODE · Hold Space to ferry fuel into your alliance zone':sim.shotSolution.outOfRange?'OUT OF RANGE · Shots will fall short':sim.config.archetype==='dumper'?'BIG DUMPER · Hold Space for fast aim and multi-lane fire':sim.activeAt(sim.config.alliance)?'YOUR HUB IS ACTIVE · Turret can shoot while moving':'YOUR HUB IS INACTIVE · Collect fuel for your next shift');
+ $('shotMode').textContent=(sim.shotMode==='pass'?'↶ PASS TO HOME':'◎ SHOOT HUB')+' · '+(sim.shotSolution.outOfRange?'OUT OF RANGE':sim.config.archetype==='dumper'?sim.fireStatus:'SWIVEL TURRET');
+ $('shotMode').classList.toggle('passing',sim.shotMode==='pass'||sim.shotSolution.outOfRange);
  const locked=sim.started;
  if(locked!==lastLocked){for(const [id]of schema)$(id).disabled=locked||(id==='lanes'&&sim.config.archetype!=='dumper');for(const id of ['team','drive','alliance','archetype','load'])$(id).disabled=locked;$('configStatus').textContent=locked?'RESET MATCH TO EDIT BUILDS':'PRE-MATCH · changes apply immediately';renderGarage();lastLocked=locked;}
  $('intake').disabled=sim.started&&!sim.controlsEnabled; $('restorePreset').disabled=sim.started||!profiles[sim.config.team];

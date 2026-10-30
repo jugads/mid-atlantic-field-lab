@@ -2,7 +2,7 @@ import * as T from './vendor/three.module.js';
 const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset}=globalThis.FieldPhysics;
 export class FieldView {
   constructor(canvas){
-    this.canvas=canvas;this.mode='driver';this.theta=0;this.phi=.89;this.distance=20;this.zoom=1;
+    this.canvas=canvas;this.mode='follow';this.theta=0;this.phi=.89;this.distance=20;this.zoom=1;
     this.scene=new T.Scene();this.scene.background=new T.Color('#181e1c');
     this.camera=new T.PerspectiveCamera(46,1,.1,120);this.cameraTarget=new T.Vector3();
     try{this.renderer=new T.WebGLRenderer({canvas,antialias:true});}
@@ -34,7 +34,7 @@ export class FieldView {
   label(value,x,z,color,size=1){const c=document.createElement('canvas');c.width=768;c.height=96;const ctx=c.getContext('2d');ctx.font='600 42px sans-serif';ctx.fillStyle=color;ctx.textAlign='center';ctx.fillText(value,384,62);const tex=new T.CanvasTexture(c),mesh=new T.Mesh(new T.PlaneGeometry(size*4,size*.5),new T.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false}));mesh.rotation.x=-Math.PI/2;mesh.position.set(x,.022,z);this.scene.add(mesh);return mesh;}
   ramp(b){
     const half=b.width/2,depth=b.depth/2,peak=FIELD.bumpHeight,x=b.x-W/2,z=b.y-H/2;
-    const shape=new T.Shape();shape.moveTo(-half,0);shape.lineTo(half,0);shape.lineTo(half,.014);shape.lineTo(0,peak);shape.lineTo(-half,.014);shape.closePath();
+    const shape=new T.Shape();shape.moveTo(-half,0);shape.lineTo(half,0);shape.lineTo(half,0);shape.lineTo(0,peak);shape.lineTo(-half,0);shape.closePath();
     const geometry=new T.ExtrudeGeometry(shape,{depth:b.depth,bevelEnabled:false,steps:1});
     const mesh=new T.Mesh(geometry,this.material(b.alliance==='blue'?'#3d67a9':'#b54843'));
     mesh.position.set(x,0,z-depth);mesh.castShadow=true;mesh.receiveShadow=true;this.scene.add(mesh);
@@ -60,7 +60,7 @@ export class FieldView {
     for(const b of bumps)this.ramp(b);
     for(const tr of trenches){
       const x=tr.x-W/2,z=tr.y-H/2,color=tr.alliance==='blue'?'#4b7ccd':'#ce6157';
-      const postZ=(tr.sign<0?1.44:H-1.44)-H/2;
+      const postZ=(tr.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16)-H/2;
       this.box(FIELD.hubSize,1.022,.32,x,.511,postZ,color);
       // Open underpass, not a roofed box. Lowest beam surface is exactly 22.25 inches high.
       this.box(.16,.12,FIELD.trenchWidth,x,FIELD.trenchClearance+.06,z,color);
@@ -162,7 +162,7 @@ export class FieldView {
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
     this.chassis.rotation.set(r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#d0ed93':'#596350');
-    const target=sim.shotTarget,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:r.a;this.updateFill(this.activeVisual,c,sim.inventory);
+    const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:r.a;this.updateFill(this.activeVisual,c,sim.inventory);
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
       if(index===sim.activeIndex)return;parkedKeys.add(index);
@@ -180,10 +180,13 @@ export class FieldView {
       for(const mesh of [v.ring,...v.lights]){mesh.material.color.copy(v.color).multiplyScalar(status.active?1:.25);
         mesh.material.emissive.copy(settling?new T.Color('#ffffff'):v.color);mesh.material.emissiveIntensity=lit*(status.transition?1.2+.5*Math.sin(sim.time*10):1.1);}
     }
-    const passing=sim.shotMode==='pass',points=[],d=Math.hypot(target.x-r.x,target.y-r.y),flight=passing?Math.max(1.05,Math.min(2.25,d/5.2)):Math.max(.8,Math.min(1.8,d/5)),launch=r.z+c.height-.05;
+    const passing=solution.passing,points=[],d=solution.reach,flight=solution.flight,launch=r.z+c.height-.05;
     const vz=(target.z-launch+.5*9.81*flight*flight)/flight;
-    for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+Math.cos(aim)*d*t/flight,launch+vz*t-4.905*t*t,z+Math.sin(aim)*d*t/flight));}
-    this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing?'#f2ce64':'#d0ed93');
+    const manual=!c.autoAim||c.archetype==='dumper';
+    const power=Math.hypot(target.x-r.x-r.vx*flight,target.y-r.y-r.vy*flight)/flight;
+    const vx=manual?Math.cos(aim)*power+r.vx:(target.x-r.x)/flight,vy=manual?Math.sin(aim)*power+r.vy:(target.y-r.y)/flight;
+    for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+vx*t,launch+vz*t-4.905*t*t,z+vy*t));}
+    this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#d0ed93');
     this.passMarker.visible=passing;this.passMarker.position.set(target.x-W/2,.025,target.y-H/2);
     const side=c.alliance==='blue'?-1:1,fit=this.camera.aspect<1.25?1.2:1;
     if(this.mode==='driver'){

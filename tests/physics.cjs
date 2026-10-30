@@ -7,7 +7,7 @@ const test=(name,fn)=>{fn();passed++;console.log('PASS '+name);};
 function advance(s,seconds,input={}){for(let i=0;i<Math.round(seconds*120);i++)s.step(1/120,input);}
 function empty(config={}){const s=new Simulation({stationary:100,...config},()=>.5);s.balls=[];return s;}
 function total(s){return s.balls.length+s.inventory+s.parked.reduce((n,r)=>n+r.inventory,0)+s.pending.length+s.outpostReserve.blue+s.outpostReserve.red;}
-function enterHub(s,alliance){const h=hubs.find(h=>h.alliance===alliance);s.balls.push({...ball(h.x,h.y,FIELD.hubHeight+.001),vz:-1,shot:true,eligible:true,shooter:alliance});s.step(1/120);}
+function enterHub(s,alliance){const h=hubs.find(h=>h.alliance===alliance);s.balls.push({...ball(h.x,h.y,FIELD.hubHeight+.001),vz:-1,shot:true,eligible:true,shooter:alliance});advance(s,.35);}
 test('504 fuel with centered pile, depot fuel and outpost reserves',()=>{
  const s=new Simulation();assert.equal(total(s),504);assert.equal(s.initialCenterCount,400);
  assert(s.balls.slice(0,400).every(b=>Math.abs(b.x-W/2)<FIELD.centerDepth/2&&Math.abs(b.y-H/2)<FIELD.centerWidth/2));
@@ -72,17 +72,17 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
  assert.equal(p341.capacity,8);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
  assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,20);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
- assert.equal(p1391.capacity,45);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
+ assert.equal(p1391.capacity,45);assert.equal(p1391.maxRange,3.7);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
  assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,30);assert.equal(p8513.moving,0);
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
 });
 test('0% SOTM profiles miss while moving but still shoot normally when stationary',()=>{
  for(const team of ['1391','8513']){
   const c={...resolvePreset(team),autoAim:false,stationary:100},s=empty(c);s.robot.vx=2;s.robot.a=0;s.inventory=8;
-  s.fire();const target=s.target, b=s.balls[0],d=Math.hypot(target.x-s.robot.x,target.y-s.robot.y),t=Math.max(.8,Math.min(1.8,d/5));
+  s.fire();const target=s.target, b=s.balls[0],d=Math.hypot(target.x-s.robot.x,target.y-s.robot.y),t=s.shotSolution.flight;
   assert(Math.hypot(b.x+b.vx*t-target.x,b.y+b.vy*t-target.y)>FIELD.openingRadius+BR,team+' should miss when moving');
   const stopped=empty(c);stopped.robot.a=Math.atan2(stopped.target.y-stopped.robot.y,stopped.target.x-stopped.robot.x);stopped.inventory=8;stopped.fire();
-  const q=stopped.balls[0],distance=Math.hypot(stopped.target.x-stopped.robot.x,stopped.target.y-stopped.robot.y),tf=Math.max(.8,Math.min(1.8,distance/5));
+  const q=stopped.balls[0],distance=Math.hypot(stopped.target.x-stopped.robot.x,stopped.target.y-stopped.robot.y),tf=stopped.shotSolution.flight;
   assert(Math.hypot(q.x+q.vx*tf-stopped.target.x,q.y+q.vy*tf-stopped.target.y)<FIELD.openingRadius,team+' should retain stationary shooting');
  }
 });
@@ -112,6 +112,46 @@ test('analog controller input provides proportional swerve and tank motion',()=>
  assert(Math.abs(s.robot.vx-2.5)<.05);assert(s.robot.a>1.7&&s.robot.a<1.9);
  const t=empty({drive:'tank'});t.start();t.time=25;t.robot.x=7;t.robot.y=1;advance(t,.2,{forward:.5,tankTurn:.5});
  assert(t.robot.a>.3&&t.robot.a<.4);assert(Math.hypot(t.robot.vx,t.robot.vy)>0);
+});
+test('hub retains fuel visibly until it reaches the sensor',()=>{
+ const s=empty();s.start();s.time=25;const h=hubs[0];
+ s.balls=[{...ball(h.x,h.y,FIELD.hubHeight+.08),vz:-4,shot:true,eligible:true,shooter:'blue'}];
+ advance(s,.035);assert.equal(s.score,0);assert.equal(s.balls.length,1);assert.equal(s.balls[0].hubInside,'blue');
+ advance(s,.3);assert.equal(s.score,1);assert.equal(s.resolved,1);
+});
+test('fuel can bounce off the hub rim and either fall in or out',()=>{
+ function throwAt(offset){const s=empty();s.start();s.time=25;const h=hubs[0];
+   s.balls=[{...ball(h.x+offset,h.y,FIELD.hubHeight+.08),vz:-4,shot:true,eligible:true,shooter:'blue'}];
+   let bounced=false;for(let i=0;i<240;i++){s.step(1/120);if(s.balls[0]?.vz>0&&s.time<25.2)bounced=true;}
+   return {s,bounced};}
+ const inside=throwAt(.5),outside=throwAt(.53);
+ assert(inside.bounced&&outside.bounced,'both shots should rebound from the lip');
+ assert.equal(inside.s.score,1);assert.equal(outside.s.score,0);
+});
+test('1391 scoring range reaches the tower but distant shots fall short',()=>{
+ const s=empty(resolvePreset('1391'));s.robot.x=TOWER.postX;s.robot.y=H/2;
+ assert(!s.shotSolution.outOfRange);assert(s.shotSolution.distance<=3.7);
+ s.robot.x=.45;const target=s.target;assert(s.shotSolution.outOfRange);assert.equal(s.fireStatus,'OUT OF RANGE');
+ const solution=s.shotSolution;assert(Math.abs(solution.reach-3.7)<1e-8);assert(solution.target.x<target.x);
+ s.config.autoAim=true;s.robot.a=s.aimAngle;s.inventory=1;assert.equal(s.fire(1),1);const b=s.balls[0];
+ assert(b.x+b.vx*solution.flight<target.x-FIELD.openingRadius,'ball should fall short of the hub');
+ s.robot.x=W/2;assert.equal(s.shotMode,'pass');assert(!s.shotSolution.outOfRange,'passing has separate range');
+});
+test('longer hub shots have a higher ballistic apex',()=>{
+ const s=empty();s.robot.y=H/2;const h=s.target,launch=s.robot.z+s.config.height-.05;
+ function apex(distance){s.robot.x=h.x-distance;const t=s.shotSolution.flight,vz=(FIELD.hubHeight-launch+.5*9.81*t*t)/t;return launch+vz*vz/(2*9.81);}
+ assert(apex(4)>apex(2)+.3);
+});
+test('wider trench lets a standard 1 m chassis use the extra margin',()=>{
+ const s=empty({width:1,length:1.05,height:.55});s.start();s.time=25;const tr=trenches[0];
+ s.robot.x=tr.x-1;s.robot.y=.83;advance(s,1.5,{right:true});
+ assert(s.robot.x>tr.x+.6,`robot stopped at ${s.robot.x}`);
+});
+test('bump height and pitch transition smoothly without snapping',()=>{
+ const s=empty(),b=bumps[0];s.robot.x=b.x-.25;s.robot.y=b.y;s.robot.z=0;s.robot.pitch=0;
+ s.updatePose(1/120);const first=s.robot.z;assert(first>0&&first<FIELD.bumpHeight*.5);
+ for(let i=0;i<120;i++)s.updatePose(1/120);assert(s.robot.z>first*3);assert(s.robot.pitch>0);
+ assert.equal(terrainHeight(b.x-b.width/2,b.y),0);
 });
 test('outside alliance zone, Space ferries fuel to home carpet',()=>{
  const s=empty();s.start();s.time=25;s.inventory=1;s.robot.x=W/2;s.robot.y=H/2-1.65;

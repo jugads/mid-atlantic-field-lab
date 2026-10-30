@@ -3,7 +3,7 @@
   const W = 16.54, H = 8.07, G = 9.81, BR = .075;
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const base = {maxSpeed:5, acceleration:10, width:.85, length:.9, height:.52,
-    intakeRate:5, feedRate:6, capacity:30, stationary:92, moving:65,
+    intakeRate:5, feedRate:6, capacity:30, stationary:92, moving:65, maxRange:6,
     drive:'swerve', alliance:'blue', autoAim:true, team:'341', autoRoutine:'preload', archetype:'turret',lanes:1};
   const ARCHETYPES = {
     turret: {label:'Turret',description:'Swiveling shooter · fire while moving',settings:{archetype:'turret',width:.85,length:.9,height:.52,capacity:30,feedRate:6,intakeRate:5,maxSpeed:5,acceleration:10,stationary:92,moving:65,lanes:1}},
@@ -11,7 +11,7 @@
   };
   const FIELD = {hubSize:1.194, hubHeight:1.83, openingRadius:.53,
     bumpDepth:1.128, bumpWidth:1.854, bumpHeight:.1654, trenchClearance:.5652,
-    trenchWidth:1.279, startLine:4.03, centerDepth:1.83, centerWidth:5.23};
+    trenchWidth:1.38, startLine:4.03, centerDepth:1.83, centerWidth:5.23};
   const hubs = [{x:4.03 + FIELD.hubSize/2,y:H/2,alliance:'blue'},
     {x:W-4.03-FIELD.hubSize/2,y:H/2,alliance:'red'}];
   const bumps = hubs.flatMap(h=>[-1,1].map(sign=>({x:h.x,
@@ -20,8 +20,8 @@
   const trenches = hubs.flatMap(h=>[-1,1].map(sign=>({x:h.x,
     y:sign<0?FIELD.trenchWidth/2:H-FIELD.trenchWidth/2,
     width:FIELD.hubSize,depth:FIELD.trenchWidth,alliance:h.alliance,sign})));
-  const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65}));
-  for (const t of trenches) solids.push({x:t.x,y:t.sign<0?1.44:H-1.44,width:FIELD.hubSize,depth:.32,height:1.022});
+  const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65,hub:true,alliance:h.alliance}));
+  for (const t of trenches) solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:1.022});
   const TOWER={depth:1.148,width:.9906,postX:.95,postGap:.8192,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[.6858,1.143,1.6002]};
   const towers=['blue','red'].map(alliance=>({alliance,x:alliance==='blue'?TOWER.postX:W-TOWER.postX,y:H/2}));
   for(const t of towers){
@@ -47,7 +47,7 @@
   function phaseAt(time) { return PHASES.find(p=>time<p.end-1e-8)||{id:'finished',label:'MATCH COMPLETE',start:166,end:166}; }
   function terrainHeight(x,y) {
     for(const b of bumps) if(Math.abs(y-b.y)<=b.depth/2 && Math.abs(x-b.x)<=b.width/2)
-      return .014+(FIELD.bumpHeight-.014)*(1-Math.abs(x-b.x)/(b.width/2));
+      return FIELD.bumpHeight*(1-Math.abs(x-b.x)/(b.width/2));
     if((x<TOWER.depth||x>W-TOWER.depth)&&Math.abs(y-H/2)<TOWER.width/2)return .008;
     return 0;
   }
@@ -107,14 +107,23 @@
       const lane=this.robot.y<H/2?H/2-1.65:H/2+1.65;
       return {x:this.config.alliance==='blue'?2.2:W-2.2,y:lane,z:BR};
     }
-    get aimAngle(){const t=this.shotTarget,r=this.robot,d=Math.hypot(t.x-r.x,t.y-r.y),flight=this.inAllianceZone?clamp(d/5,.8,1.8):clamp(d/5.2,1.05,2.25);
-      return Math.atan2(t.y-r.y-r.vy*flight,t.x-r.x-r.vx*flight);}
+    get shotSolution(){
+      const h=this.shotTarget,r=this.robot,passing=!this.inAllianceZone;
+      const dx=h.x-r.x,dy=h.y-r.y,d=Math.hypot(dx,dy),reach=passing?d:Math.min(d,this.config.maxRange);
+      const factor=d>1e-8?reach/d:0,target={x:r.x+dx*factor,y:r.y+dy*factor,z:h.z};
+      // Longer scoring shots stay aloft longer and therefore follow a higher arc.
+      const flight=passing?clamp(d/5.2,1.05,2.25):clamp(.75+reach*.15,.9,2.25);
+      return {target,actualTarget:h,distance:d,reach,flight,passing,outOfRange:!passing&&d>this.config.maxRange+.001};
+    }
+    get aimAngle(){const {target,flight}=this.shotSolution,r=this.robot;
+      return Math.atan2(target.y-r.y-r.vy*flight,target.x-r.x-r.vx*flight);}
     get fireStatus(){
       if(!this.inventory)return 'EMPTY';
       if(this.config.archetype==='dumper'){
         const error=Math.atan2(Math.sin(this.aimAngle-this.robot.a),Math.cos(this.aimAngle-this.robot.a));
         if(this.config.autoAim&&Math.abs(error)>.07)return 'ALIGNING CHASSIS';
       }
+      if(this.shotSolution.outOfRange)return 'OUT OF RANGE';
       return this.inAllianceZone?'SHOOT HUB':'PASS TO HOME';
     }
     get radius(){return Math.hypot(this.config.width,this.config.length)/2;}
@@ -164,16 +173,17 @@
         r.x+=hit.nx*(hit.depth+.00001);r.y+=hit.ny*(hit.depth+.00001);const v=r.vx*hit.nx+r.vy*hit.ny;
         if(v<0){r.vx-=v*hit.nx;r.vy-=v*hit.ny;}}
     }
-    updatePose(){const r=this.robot,c=this.config,ca=Math.cos(r.a),sa=Math.sin(r.a),l=c.length*.34,w=c.width*.34;
+    updatePose(dt=0){const r=this.robot,c=this.config,ca=Math.cos(r.a),sa=Math.sin(r.a),l=c.length*.34,w=c.width*.34;
       const fl=terrainHeight(r.x+ca*l-sa*w,r.y+sa*l+ca*w),fr=terrainHeight(r.x+ca*l+sa*w,r.y+sa*l-ca*w),
         bl=terrainHeight(r.x-ca*l-sa*w,r.y-sa*l+ca*w),br=terrainHeight(r.x-ca*l+sa*w,r.y-sa*l-ca*w);
-      r.z=(fl+fr+bl+br)/4;r.pitch=Math.atan2((fl+fr-bl-br)/2,2*l);r.roll=Math.atan2((fl+bl-fr-br)/2,2*w);
+      const height=(fl+fr+bl+br)/4,pitch=Math.atan2((fl+fr-bl-br)/2,2*l),roll=Math.atan2((fl+bl-fr-br)/2,2*w);
+      const alpha=dt>0?1-Math.exp(-16*dt):1;
+      r.z+=(height-r.z)*alpha;r.pitch+=(pitch-r.pitch)*alpha;r.roll+=(roll-r.roll)*alpha;
     }
     fire(limit=Infinity){
       if(!this.inventory||this.fireStatus==='ALIGNING CHASSIS')return 0;
-      const r=this.robot,c=this.config,h=this.shotTarget,passing=!this.inAllianceZone;
-      const d=Math.hypot(h.x-r.x,h.y-r.y),launch=r.z+c.height-.05,
-        t=passing?clamp(d/5.2,1.05,2.25):clamp(d/5,.8,1.8),speed=Math.hypot(r.vx,r.vy);
+      const r=this.robot,c=this.config,{target:h,passing,flight:t,reach:d}=this.shotSolution;
+      const launch=r.z+c.height-.05,speed=Math.hypot(r.vx,r.vy);
       const accuracy=(c.stationary+(c.moving-c.stationary)*clamp(speed/c.maxSpeed,0,1))/100;
       const sigma=(passing?.06:.025)+(1-accuracy)*(passing?.45:1.1)+Math.abs(r.pitch)*.3;
       const gaussian=()=>Math.sqrt(-2*Math.log(Math.max(1e-8,this.random())))*Math.cos(2*Math.PI*this.random());
@@ -228,12 +238,13 @@
       let turn=clamp(((input.clockwise?1:0)-(input.counterclockwise?1:0))+(input.turnAxis||0),-1,1);
       if(c.drive==='tank'){turn=clamp(turn+(input.right?1:0)-(input.left?1:0)+(input.tankTurn||0),-1,1);const f=clamp(input.forward??((input.up?1:0)-(input.down?1:0)),-1,1);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
       r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
-      const onBump=r.z>.008||terrainHeight(r.x,r.y)>0,max=c.maxSpeed*(onBump?.65:1);
+      const bumpFactor=clamp(Math.max(r.z,terrainHeight(r.x,r.y))/FIELD.bumpHeight,0,1);
+      const max=c.maxSpeed*(1-.22*bumpFactor);
       // Brake much harder when the stick is neutral; commanded acceleration is unchanged.
       const braking=Math.max(12,c.acceleration*3);
       let dx=x*max-r.vx,dy=y*max-r.vy,delta=Math.hypot(dx,dy),step=(len>0?c.acceleration:braking)*dt;
       if(delta>step){dx*=step/delta;dy*=step/delta;}r.vx+=dx;r.vy+=dy;r.x+=r.vx*dt;r.y+=r.vy*dt;
-      this.resolveRobot();this.updatePose();
+      this.resolveRobot();this.updatePose(dt);
     }
     collideBallBox(b,box){
       const bottom=box.bottom||0;if(b.z-BR>box.height||b.z+BR<bottom)return;
@@ -247,6 +258,29 @@
       }else{b.x+=dx/d*(BR-d);b.y+=dy/d*(BR-d);b.z+=dz/d*(BR-d);}
       const nx=dx/d,ny=dy/d,nz=dz/d,v=b.vx*nx+b.vy*ny+b.vz*nz;
       if(v<0){b.vx-=1.4*v*nx;b.vy-=1.4*v*ny;b.vz-=1.4*v*nz;}
+    }
+    collideHubRim(b,h){
+      // A tube around the opening lets glancing shots visibly rebound instead of vanishing.
+      const dz=b.z-FIELD.hubHeight,contact=BR+.025;
+      if(Math.abs(dz)>contact)return;
+      const dx=b.x-h.x,dy=b.y-h.y,r=Math.hypot(dx,dy);if(r<1e-8)return;
+      const radial=r-FIELD.openingRadius,dist=Math.hypot(radial,dz);if(dist>=contact)return;
+      const nr=dist>1e-8?radial/dist:0,nz=dist>1e-8?dz/dist:1,nx=dx/r*nr,ny=dy/r*nr;
+      const penetration=contact-dist;b.x+=nx*penetration;b.y+=ny*penetration;b.z+=nz*penetration;
+      const vn=b.vx*nx+b.vy*ny+b.vz*nz;if(vn<0){b.vx-=1.55*vn*nx;b.vy-=1.55*vn*ny;b.vz-=1.55*vn*nz;}
+    }
+    collideHubFunnel(b,h){
+      // Cone wall directs balls inward but can bounce them back over the lip.
+      const bottom=FIELD.hubHeight-.35,slope=(FIELD.openingRadius-.30)/.35;
+      if(b.z>FIELD.hubHeight+BR){b.hubInside=null;return;}
+      if(b.z<bottom-.08)return;
+      const dx=b.x-h.x,dy=b.y-h.y,r=Math.hypot(dx,dy);if(r<1e-8)return;
+      const radius=.30+slope*clamp(b.z-bottom,0,.35),allowed=radius-BR*Math.sqrt(1+slope*slope);
+      if(r<=allowed)return;
+      const push=(r-allowed)/(1+slope*slope),nx=dx/r,ny=dy/r;
+      b.x-=nx*push;b.y-=ny*push;b.z+=slope*push;
+      const norm=Math.sqrt(1+slope*slope),vx=-nx/norm,vy=-ny/norm,vz=slope/norm;
+      const vn=b.vx*vx+b.vy*vy+b.vz*vz;if(vn<0){b.vx-=1.45*vn*vx;b.vy-=1.45*vn*vy;b.vz-=1.45*vn*vz;}
     }
     collideFuel(){
       // Spatial hash keeps dense starting piles and recycled fuel from passing through one another.
@@ -285,7 +319,7 @@
       const wantsFire=control.shoot;
       if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise&&Math.abs(control.turnAxis||0)<.01&&Math.abs(control.tankTurn||0)<.01){
         const error=Math.atan2(Math.sin(this.aimAngle-r.a),Math.cos(this.aimAngle-r.a));
-        const rotation=clamp(error,-12*dt,12*dt);r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose();
+        const rotation=clamp(error,-12*dt,12*dt);r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose(dt);
       }
       // The configured rate is the average total output across all lanes. Dumpers
       // emit individual balls with ±15% interval variation instead of synchronized volleys.
@@ -298,10 +332,17 @@
       this.releaseFuel();const kept=[];
       for(const b of this.balls){
         const old={x:b.x,y:b.y,z:b.z};b.x+=b.vx*dt;b.y+=b.vy*dt;b.z+=b.vz*dt;b.vz-=G*dt;
-        if(b.vz<0&&old.z>=FIELD.hubHeight&&b.z<FIELD.hubHeight){
+        for(const hub of hubs)this.collideHubRim(b,hub);
+        if(!b.hubInside&&b.vz<0&&old.z>=FIELD.hubHeight&&b.z<FIELD.hubHeight){
           const f=(old.z-FIELD.hubHeight)/(old.z-b.z),px=old.x+(b.x-old.x)*f,py=old.y+(b.y-old.y)*f;
           const hub=hubs.find(h=>Math.hypot(px-h.x,py-h.y)<FIELD.openingRadius-BR);
-          if(hub){this.processHub(b,hub);continue;}
+          if(hub)b.hubInside=hub.alliance;
+        }
+        if(b.hubInside){
+          const hub=hubs.find(h=>h.alliance===b.hubInside);
+          this.collideHubFunnel(b,hub);
+          // Count only once the ball reaches the sensor, not when it touches the rim.
+          if(b.hubInside&&b.z<=FIELD.hubHeight-.32&&b.vz<0){this.processHub(b,hub);continue;}
         }
         const floor=terrainHeight(b.x,b.y)+BR;
         if(b.z<=floor){const impact=Math.max(0,-b.vz);if(impact>1){const grip=Math.max(.25,1-impact*.065);b.vx*=grip;b.vy*=grip;}b.z=floor;b.vz=Math.abs(b.vz)>.8?-b.vz*.35:0;b.vx*=Math.exp(-1.15*dt);b.vy*=Math.exp(-1.15*dt);
@@ -309,7 +350,7 @@
           if(b.shot){if(!b.checked)this.resolved++;b.shot=false;b.checked=true;}}
         if(b.x<BR||b.x>W-BR){b.x=clamp(b.x,BR,W-BR);b.vx*=-.55;}
         if(b.y<BR||b.y>H-BR){b.y=clamp(b.y,BR,H-BR);b.vy*=-.55;}
-        for(const box of solids)this.collideBallBox(b,box);
+        for(const box of solids)if(!(box.hub&&box.alliance===b.hubInside))this.collideBallBox(b,box);
         // Trench overhangs block airborne fuel and tall chassis; the low lane stays open.
         for(const tr of trenches)if(b.z>FIELD.trenchClearance&&b.z<.69&&Math.abs(b.x-tr.x)<tr.width/2&&Math.abs(b.y-tr.y)<tr.depth/2){
           b.z=b.vz>0?FIELD.trenchClearance-BR:.69+BR;b.vz*=-.35;}
