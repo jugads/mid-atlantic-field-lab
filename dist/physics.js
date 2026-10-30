@@ -22,11 +22,11 @@
     width:FIELD.hubSize,depth:FIELD.trenchWidth,alliance:h.alliance,sign})));
   const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65,hub:true,alliance:h.alliance}));
   for (const t of trenches) solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:1.022});
-  const TOWER={depth:1.148,width:.9906,postX:.95,postGap:.8192,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[.6858,1.143,1.6002]};
+  const TOWER={depth:1.148,width:1.45,postX:.95,postGap:1.35,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[.90,1.143,1.6002]};
   const towers=['blue','red'].map(alliance=>({alliance,x:alliance==='blue'?TOWER.postX:W-TOWER.postX,y:H/2}));
   for(const t of towers){
     for(const side of [-1,1])solids.push({x:t.x,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:TOWER.postDepth,depth:TOWER.postWidth,height:TOWER.postHeight,bottom:0,tower:true});
-    for(const z of TOWER.rungs)solids.push({x:t.x,y:t.y,width:TOWER.rungDiameter,depth:1.194,height:z+TOWER.rungDiameter/2,bottom:z-TOWER.rungDiameter/2,tower:true});
+    for(const z of TOWER.rungs)solids.push({x:t.x,y:t.y,width:TOWER.rungDiameter,depth:TOWER.postGap+2*TOWER.postWidth,height:z+TOWER.rungDiameter/2,bottom:z-TOWER.rungDiameter/2,tower:true});
     const towardWall=t.alliance==='blue'?-1:1;
     for(const side of [-1,1])for(let i=0;i<8;i++){const f=i/7;solids.push({x:t.x+towardWall*f*.85,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:.13,depth:.045,bottom:.72+f*.38-.025,height:.72+f*.38+.025,tower:true});}
   }

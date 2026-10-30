@@ -96,7 +96,7 @@ export class FieldView {
       this.box(TOWER.depth,.008,TOWER.width,h.alliance==='blue'?-W/2+TOWER.depth/2:W/2-TOWER.depth/2,.004,0,'#202722');
       const poleSpacing=(TOWER.postGap+TOWER.postWidth)/2;
       for(const dz of [-poleSpacing,poleSpacing])this.box(TOWER.postDepth,TOWER.postHeight,TOWER.postWidth,tx,TOWER.postHeight/2,dz,color);
-      for(const y of TOWER.rungs){const rung=this.cylinder(TOWER.rungDiameter/2,TOWER.rungDiameter/2,1.194,tx,y,0,color);rung.rotation.x=Math.PI/2;}
+      for(const y of TOWER.rungs){const rung=this.cylinder(TOWER.rungDiameter/2,TOWER.rungDiameter/2,TOWER.postGap+2*TOWER.postWidth,tx,y,0,color);rung.rotation.x=Math.PI/2;}
       const wallDirection=h.alliance==='blue'?-1:1;
       for(const side of [-1,1]){
         const from=new T.Vector3(tx,.72,side*poleSpacing),to=new T.Vector3(tx+wallDirection*.85,1.1,side*poleSpacing);

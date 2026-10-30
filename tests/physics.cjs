@@ -255,6 +255,16 @@ test('tower rungs have vertical clearance and block at their actual height',()=>
  const hit={...ball(rung.x+.03,rung.y,TOWER.rungs[0]),vx:-3};s.collideBallBox(hit,rung);assert(hit.x>rung.x+.03);assert(hit.vx>0);
  assert.equal(terrainHeight(.5,H/2),.008);
 });
+test('built-in robots fit beneath both towers and still collide with uprights',()=>{
+ for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
+  const s=empty(resolvePreset(team,alliance)), x=alliance==='blue'?TOWER.postX:W-TOWER.postX;
+  Object.assign(s.robot,{x,y:H/2,z:0,a:0,vx:0,vy:0});s.resolveRobot();
+  assert(Math.abs(s.robot.x-x)<1e-6,team+' should fit under '+alliance+' tower');
+  assert(Math.abs(s.robot.y-H/2)<1e-6,team+' should fit between uprights');
+ }
+ const s=empty(resolvePreset('341'));Object.assign(s.robot,{x:TOWER.postX,y:H/2+(TOWER.postGap+TOWER.postWidth)/2,z:0,a:0,vx:0,vy:0});
+ s.resolveRobot();assert.notEqual(s.robot.y,H/2+(TOWER.postGap+TOWER.postWidth)/2);
+});
 test('fleet preserves inventories and setup fuel count when adding/switching',()=>{
  const s=new Simulation();assert(s.addRobot({...ARCHETYPES.dumper.settings,team:'1640',alliance:'blue'}));assert.equal(s.initialCenterCount,392);assert.equal(total(s),504);
  s.inventory=3;s.switchRobot(0);assert.equal(s.inventory,8);s.switchRobot(1);assert.equal(s.inventory,3);
