@@ -36,15 +36,16 @@ Big dumper: fixed, fast chassis-aim shooter with 1–6 parallel lanes. It can sh
 
 ## Physics and geometry
 
-SI units, 120 Hz base stepping with adaptive contact substeps so high-speed fuel moves less than 0.55 ball radii per substep. Spatially hashed sphere contacts, restitution, gravity, impact/rolling losses, and relative-velocity moving-chassis contacts. Robot footprints use oriented-box contacts. Shot spread depends on range, chassis pitch, and speed. Passing uses ballistic trajectories to an alliance-zone landing target. Fuel and inventory are conserved through capture, capacity changes, scoring and recycling.
+Neutral drive input brakes at three times configured acceleration (minimum 12 m/s²). SI units, 120 Hz base stepping with adaptive contact substeps so high-speed fuel moves less than 0.55 ball radii per substep. Spatially hashed sphere contacts, restitution, gravity, impact/rolling losses, and relative-velocity moving-chassis contacts. Robot footprints use oriented-box contacts. Shot spread depends on range, chassis pitch, and speed. Passing uses ballistic trajectories to an alliance-zone landing target. Fuel and inventory are conserved through capture, capacity changes, scoring and recycling.
 
 Bumps have sloping faces, approximately 15 degrees, 1.128 m travel depth, 1.854 m width and 0.1654 m crest height. Wheel contact samples raise/pitch/roll the chassis. Trenches have 0.5652 m clearance and 1.279 m usable lane width; tall robots cannot pass. Towers have a traversable base, separate upright, brace and rung collision volumes; rung heights are 0.6858, 1.143 and 1.6002 m. Robots and fuel collide with these structures at their actual modeled heights.
 
-This is a practice simulator, not a full rigid-body FRC digital twin. Tower depth placement and brace contact volumes are approximations; suspension, hub netting, ball deformation, and distribution are simplified. Climbing and climb scoring, fouls, ranking points, AI robots and human-player feeding are not implemented. Outpost reserves remain stored. Team names are real; all robot performance presets are illustrative, not scouting measurements. Accuracy settings tune spread rather than guarantee a score percentage.
+This is a practice simulator, not a full rigid-body FRC digital twin. Tower depth placement and brace contact volumes are approximations; suspension, hub netting, ball deformation, and distribution are simplified. Climbing and climb scoring, fouls, ranking points, AI robots and human-player feeding are not implemented. Outpost reserves remain stored. Teams 341, 316, 1391 and 8513 have built-in presets based on the supplied specifications. Unspecified width, length, speed, acceleration and stationary accuracy use archetype defaults. Team 341 height (0.400 m) and moving accuracy (90%) interpret “very short” and “high”; team 8513 height is the 2026 legal maximum of 0.762 m, and its unspecified lane count defaults to three. Zero moving accuracy makes moving shots miss while allowing stationary shots. Accuracy settings tune spread rather than guarantee a score percentage.
 
 ## Source
 
-- `dist/physics.js`: match state, fleet, geometry constants and simulation.
+- `dist/physics.js`: match state, fleet, braking, geometry constants and simulation.
+- `dist/team-presets.js`: permanent, version-controlled user-specified team builds.
 - `dist/view3d.js`: Three.js models, instanced fuel and camera views.
 - `dist/app.js`: input, menus, team build persistence and HUD.
 - `tests/physics.cjs`: timing, setup, recycling, passing, high-speed contacts, lane rate, tower clearance, fleet and full-match conservation checks.

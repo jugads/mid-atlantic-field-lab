@@ -187,6 +187,13 @@
           const magnitude=Math.hypot(h.x-r.x-r.vx*t,h.y-r.y-r.vy*t)/t;
           vx=Math.cos(r.a)*magnitude+r.vx+ex/t;vy=Math.sin(r.a)*magnitude+r.vy+ey/t;
         }
+        // 0% SOTM means a moving scoring shot cannot land in the hub opening.
+        // Passing still works; once stopped, the normal stationary spread applies.
+        if(!passing&&c.moving===0&&speed>.15){
+          const dx=ox+vx*t-h.x,dy=oy+vy*t-h.y,miss=Math.hypot(dx,dy),margin=FIELD.openingRadius+BR+.25;
+          if(miss<margin){const nx=miss>1e-6?dx/miss:1,ny=miss>1e-6?dy/miss:0;
+            vx+=(margin-miss)*nx/t;vy+=(margin-miss)*ny/t;}
+        }
         this.balls.push({...ball(ox,oy,launch),vx,vy,vz:(h.z-launch+.5*G*t*t)/t,
           shot:!passing,pass:passing,shooter:c.alliance,eligible:!passing,launchTime:this.time,lane});
         this.inventory--;if(passing)this.passed++;else this.fired++;
@@ -220,7 +227,9 @@
       if(c.drive==='tank'){turn+=(input.right?1:0)-(input.left?1:0);const f=(input.up?1:0)-(input.down?1:0);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
       r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
       const onBump=r.z>.008||terrainHeight(r.x,r.y)>0,max=c.maxSpeed*(onBump?.65:1);
-      let dx=x*max-r.vx,dy=y*max-r.vy,delta=Math.hypot(dx,dy),step=c.acceleration*dt;
+      // Brake much harder when the stick is neutral; commanded acceleration is unchanged.
+      const braking=Math.max(12,c.acceleration*3);
+      let dx=x*max-r.vx,dy=y*max-r.vy,delta=Math.hypot(dx,dy),step=(len>0?c.acceleration:braking)*dt;
       if(delta>step){dx*=step/delta;dy*=step/delta;}r.vx+=dx;r.vy+=dy;r.x+=r.vx*dt;r.y+=r.vy*dt;
       this.resolveRobot();this.updatePose();
     }

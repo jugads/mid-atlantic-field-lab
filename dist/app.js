@@ -1,12 +1,12 @@
 import {FieldView} from './view3d.js';
 const {Simulation,base,ARCHETYPES,clamp,FIELD}=globalThis.FieldPhysics;
-const $=id=>document.getElementById(id),sim=new Simulation(),canvas=$('field'),view=new FieldView(canvas);
+const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
+const $=id=>document.getElementById(id),sim=new Simulation(resolvePreset('341')),canvas=$('field'),view=new FieldView(canvas);
 let grid=false,keys=new Set(),last=0,accumulator=0,lastLocked=null;
 const schema=[['maxSpeed','Top speed',1,6,.1,'m/s','driveSettings'],['acceleration','Acceleration',1,12,.5,'m/s²','driveSettings'],
- ['width','Width',.55,1.2,.05,'m','driveSettings'],['length','Length',.55,1.2,.05,'m','driveSettings'],['height','Height',.4,.9,.01,'m','driveSettings'],
+ ['width','Width',.55,1.2,.05,'m','driveSettings'],['length','Length',.55,1.2,.05,'m','driveSettings'],['height','Height',.4,.9,.001,'m','driveSettings'],
  ['intakeRate','Intake rate',1,100,1,'fuel/s','fuelSettings'],['feedRate','Feed rate',1,25,1,'fuel/s','fuelSettings'],['capacity','Capacity',1,80,1,'fuel','fuelSettings'],
  ['lanes','Shooter lanes',1,6,1,'lanes','shootSettings'],['stationary','Stationary accuracy',10,100,1,'%','shootSettings'],['moving','Moving accuracy',0,100,1,'%','shootSettings']];
-const names={'341':'Miss Daisy','1640':'Sab-BOT-age','2590':'Nemesis','2539':'Krypton Cougars','1403':'Cougar Robotics','2607':'The Fighting RoboVikings','1218':'SCH Robotics','1923':'The MidKnight Inventors','1676':'The Pascack PI-oneers','365':'Miracle Workerz'};
 for(const id of ['team','addTeam'])for(const [number,name]of Object.entries(names)){$(id).add(new Option(number+' · '+name,number));}
 $('addTeam').value='1640';
 let builds={};
@@ -16,15 +16,13 @@ function normalize(p){const valid={...base};for(const [id,,min,max]of schema)if(
  valid.team=Object.hasOwn(names,p.team)?p.team:'341';return valid;}
 try{const data=JSON.parse(localStorage.getItem('fma-team-builds-v1')||'{}');for(const team of Object.keys(names))if(data[team])builds[team]=normalize({...data[team],team});}catch{}
 
-const profiles={'341':{...base},'1640':{...base,team:'1640',maxSpeed:4.2,capacity:40,intakeRate:7,feedRate:5},
- '2590':{...base,team:'2590',maxSpeed:4.8,capacity:24,feedRate:8,moving:75},custom:{...base,team:'custom'}};
 for(const [id,label,min,max,step,unit,group] of schema){
  const row=document.createElement('div');row.className='slider-row';
  row.innerHTML=`<label for="${id}">${label}<output id="${id}Value"></output></label><input id="${id}" type="range" min="${min}" max="${max}" step="${step}" value="${base[id]}">`;
  $(group).append(row);$(id).addEventListener('input',()=>{sim.setConfig({[id]:Number($(id).value)});sim.reset();refreshConfig();});
 }
 function refreshConfig(){
- for(const [id,,, ,step,unit] of schema){$(id).value=sim.config[id];$(id+'Value').textContent=(step<1?Number(sim.config[id]).toFixed(step<.1?2:1):sim.config[id])+' '+unit;}
+ for(const [id,,, ,step,unit] of schema){$(id).value=sim.config[id];$(id+'Value').textContent=(step<1?Number(sim.config[id]).toFixed(step<.01?3:step<.1?2:1):sim.config[id])+' '+unit;}
  for(const id of ['drive','alliance','team','archetype'])$(id).value=sim.config[id];$('autoAim').checked=sim.config.autoAim;
  $('robotNumber').textContent=sim.config.team==='custom'?'FMA':sim.config.team;$('robotName').textContent=names[sim.config.team];
  $('robotType').textContent=ARCHETYPES[sim.config.archetype].label+' · '+(sim.config.drive==='swerve'?'Swerve':'Tank')+' · '+(sim.config.alliance==='blue'?'Blue':'Red')+' alliance';
@@ -33,6 +31,7 @@ function refreshConfig(){
  $('clearanceNote').classList.toggle('warning',sim.config.height>FIELD.trenchClearance);
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${sim.fleet.reduce((n,r,i)=>n+Math.min(8,r.config.capacity),0)} preload`;
  $('archetypeNote').textContent=ARCHETYPES[sim.config.archetype].description;
+ $('restorePreset').disabled=sim.started||!profiles[sim.config.team];
  $('aimLabel').textContent=sim.config.archetype==='dumper'?'Fast chassis aim assist':'Auto-aim turret';
  lastLocked=null;updateIntake();updateMatch();renderGarage();
 }
@@ -45,7 +44,7 @@ $('start').onclick=()=>{sim.start();keys.clear();$('settingsPanel').hidden=true;
 $('intake').onclick=()=>{if(sim.started&&!sim.controlsEnabled)return;sim.intake=!sim.intake;updateIntake();};
 $('viewGrid').onclick=()=>{grid=!grid;$('viewGrid').textContent=grid?'▦ Grid on':'▦ Grid off';$('viewGrid').setAttribute('aria-pressed',grid);};
 $('team').onchange=()=>{const team=$('team').value,alliance=sim.config.alliance;
- sim.setConfig({...base,...(profiles[team]||{}),...(builds[team]||ARCHETYPES[sim.config.archetype].settings),team,alliance});reset();};
+ sim.setConfig({...base,...(builds[team]||resolvePreset(team,alliance)||ARCHETYPES[sim.config.archetype].settings),team,alliance});reset();};
 $('archetype').onchange=()=>{sim.setConfig(ARCHETYPES[$('archetype').value].settings);reset();};
 for(const id of ['drive','alliance'])$(id).onchange=()=>{
  const value=$(id).value;
@@ -53,7 +52,8 @@ for(const id of ['drive','alliance'])$(id).onchange=()=>{
  sim.setConfig({[id]:value});reset();};
 $('autoAim').onchange=()=>sim.setConfig({autoAim:$('autoAim').checked});
 $('save').onclick=()=>{try{builds[sim.config.team]=normalize(sim.config);localStorage.setItem('fma-team-builds-v1',JSON.stringify(builds));$('saveStatus').textContent='Saved build to team '+sim.config.team+'.';renderGarage();}catch{$('saveStatus').textContent='Storage unavailable in this browser.';}};
-$('load').onclick=()=>{const saved=builds[sim.config.team];if(!saved){$('saveStatus').textContent='No saved build for this team yet.';return;}sim.setConfig({...saved,alliance:sim.config.alliance});reset();$('saveStatus').textContent='Loaded team '+sim.config.team+' build.';};
+$('load').onclick=()=>{const saved=builds[sim.config.team];if(!saved){$('saveStatus').textContent='No saved build for this team yet.';return;}sim.setConfig({...saved,alliance:sim.config.alliance});reset();$('saveStatus').textContent='Loaded saved team '+sim.config.team+' build.';};
+$('restorePreset').onclick=()=>{const preset=resolvePreset(sim.config.team,sim.config.alliance);if(!preset)return;sim.setConfig(preset);reset();$('saveStatus').textContent='Loaded built-in team '+sim.config.team+' build.';};
 function openPanel(id){const wasOpen=!$(id).hidden;for(const panel of ['settingsPanel','garagePanel'])$(panel).hidden=true;
  if(!wasOpen){if(sim.running)togglePause();$(id).hidden=false;renderGarage();}}
 $('settingsToggle').onclick=()=>openPanel('settingsPanel');$('garageToggle').onclick=()=>openPanel('garagePanel');
@@ -71,12 +71,18 @@ function renderGarage(){
  });
  $('addRobot').disabled=sim.started||sim.fleet.length>=6;
  const library=$('buildList');library.replaceChildren();
- const saved=Object.entries(builds);if(!saved.length){library.textContent='Save a build in Settings to keep it here.';library.className='disclaimer';}
- else{library.className='';for(const [team,config]of saved){const card=document.createElement('div');card.className='saved-card';card.textContent=team+' · '+names[team];const detail=document.createElement('small');detail.textContent=ARCHETYPES[config.archetype].label+' · '+config.capacity+' fuel · '+config.feedRate+' fuel/s';card.append(detail);library.append(card);}}
+ for(const [team] of Object.entries(profiles)){const config=resolvePreset(team);const card=document.createElement('div');card.className='saved-card';card.textContent=team+' · '+names[team];
+  const detail=document.createElement('small');detail.textContent='BUILT-IN · '+ARCHETYPES[config.archetype].label+' · '+config.capacity+' fuel · '+config.feedRate+' fuel/s';card.append(detail);library.append(card);}
+ for(const [team,config] of Object.entries(builds)){const card=document.createElement('div');card.className='saved-card';card.textContent=team+' · '+names[team];
+  const detail=document.createElement('small');detail.textContent='SAVED IN BROWSER · '+ARCHETYPES[config.archetype].label+' · '+config.capacity+' fuel · '+config.feedRate+' fuel/s';card.append(detail);library.append(card);}
 }
-$('addRobot').onclick=()=>{const team=$('addTeam').value,archetype=$('addArchetype').value,alliance=$('addAlliance').value;
- const saved=builds[team]?.archetype===archetype?builds[team]:null;
- const config={...base,...ARCHETYPES[archetype].settings,...saved,team,alliance};
+$('addTeam').onchange=()=>{const team=$('addTeam').value;$('addArchetype').value=profiles[team]?'builtin':builds[team]?'saved':'turret';};
+$('addArchetype').value='turret';
+$('addRobot').onclick=()=>{const team=$('addTeam').value,selection=$('addArchetype').value,alliance=$('addAlliance').value;
+ let config;
+ if(selection==='builtin'){config=resolvePreset(team,alliance);if(!config){$('garageStatus').textContent='No built-in build for this team; choose a generic build.';return;}}
+ else if(selection==='saved'){if(!builds[team]){$('garageStatus').textContent='No saved build for this team yet.';return;}config={...builds[team],team,alliance};}
+ else config={...base,...ARCHETYPES[selection].settings,team,alliance};
  if(!sim.addRobot(config)){$('garageStatus').textContent='Reset first; maximum 6 robots and 3 per alliance.';return;}
  keys.clear();refreshConfig();$('garageStatus').textContent='Added '+team+' to '+alliance+'. Close this menu to drive.';
 };
@@ -120,7 +126,7 @@ function updateMatch(){
  $('shotMode').classList.toggle('passing',sim.shotMode==='pass');
  const locked=sim.started;
  if(locked!==lastLocked){for(const [id]of schema)$(id).disabled=locked||(id==='lanes'&&sim.config.archetype!=='dumper');for(const id of ['team','drive','alliance','archetype','load'])$(id).disabled=locked;$('configStatus').textContent=locked?'RESET MATCH TO EDIT BUILDS':'PRE-MATCH · changes apply immediately';renderGarage();lastLocked=locked;}
- $('intake').disabled=sim.started&&!sim.controlsEnabled;
+ $('intake').disabled=sim.started&&!sim.controlsEnabled; $('restorePreset').disabled=sim.started||!profiles[sim.config.team];
 }
 function draw(){
  view.draw(sim,grid);const r=sim.robot,c=sim.config;

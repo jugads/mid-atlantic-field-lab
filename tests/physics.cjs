@@ -1,5 +1,6 @@
 const assert=require('node:assert/strict');
 const {Simulation,ARCHETYPES,FIELD,TOWER,W,H,BR,hubs,bumps,trenches,solids,ball,phaseAt,terrainHeight}=require('../dist/physics.js');
+const {profiles,resolve:resolvePreset}=require('../dist/team-presets.js');
 let passed=0;
 const test=(name,fn)=>{fn();passed++;console.log('PASS '+name);};
 function advance(s,seconds,input={}){for(let i=0;i<Math.round(seconds*120);i++)s.step(1/120,input);}
@@ -57,6 +58,32 @@ test('bump slope lifts and pitches chassis; trench rejects tall robots',()=>{
 });
 test('turning alone does not translate swerve',()=>{
  const s=empty();s.start();s.time=25;const x=s.robot.x,y=s.robot.y;advance(s,.15,{clockwise:true});assert(s.robot.a>0);assert(Math.hypot(s.robot.x-x,s.robot.y-y)<.001);
+});
+test('releasing drive controls applies strong braking without changing acceleration',()=>{
+ const s=empty();s.start();s.time=25;s.robot.x=7;s.robot.y=1;advance(s,.75,{right:true});
+ assert(Math.abs(s.robot.vx-s.config.maxSpeed)<.02,`top speed ${s.robot.vx}`);
+ const x=s.robot.x;advance(s,.25);assert(Math.hypot(s.robot.vx,s.robot.vy)<.02,'should stop within 0.25 seconds');
+ assert(s.robot.x-x<.6,'neutral stopping distance should stay under 0.6 m');
+});
+test('user-supplied team builds resolve with the requested specifications',()=>{
+ const p341=resolvePreset('341'),p316=resolvePreset('316'),p1391=resolvePreset('1391'),p8513=resolvePreset('8513');
+ assert.equal(Object.keys(profiles).length,4);
+ assert.equal(p341.capacity,8);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
+ assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
+ assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,20);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
+ assert.equal(p1391.capacity,45);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
+ assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,30);assert.equal(p8513.moving,0);
+ assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
+});
+test('0% SOTM profiles miss while moving but still shoot normally when stationary',()=>{
+ for(const team of ['1391','8513']){
+  const c={...resolvePreset(team),autoAim:false,stationary:100},s=empty(c);s.robot.vx=2;s.robot.a=0;s.inventory=8;
+  s.fire();const target=s.target, b=s.balls[0],d=Math.hypot(target.x-s.robot.x,target.y-s.robot.y),t=Math.max(.8,Math.min(1.8,d/5));
+  assert(Math.hypot(b.x+b.vx*t-target.x,b.y+b.vy*t-target.y)>FIELD.openingRadius+BR,team+' should miss when moving');
+  const stopped=empty(c);stopped.robot.a=Math.atan2(stopped.target.y-stopped.robot.y,stopped.target.x-stopped.robot.x);stopped.inventory=8;stopped.fire();
+  const q=stopped.balls[0],distance=Math.hypot(stopped.target.x-stopped.robot.x,stopped.target.y-stopped.robot.y),tf=Math.max(.8,Math.min(1.8,distance/5));
+  assert(Math.hypot(q.x+q.vx*tf-stopped.target.x,q.y+q.vy*tf-stopped.target.y)<FIELD.openingRadius,team+' should retain stationary shooting');
+ }
 });
 test('outside alliance zone, Space ferries fuel to home carpet',()=>{
  const s=empty();s.start();s.time=25;s.inventory=1;s.robot.x=W/2;s.robot.y=H/2-1.65;
