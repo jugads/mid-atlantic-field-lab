@@ -1,24 +1,54 @@
 # Mid-Atlantic Field Lab
 
-A single-player 3D browser simulator with locally bundled Three.js (MIT licensed). No build step or package installation needed. Serve `dist` with any static server:
+Full-screen, single-player 3D REBUILT field simulator. Three.js is bundled locally under its MIT license; there is no build step.
 
 ```sh
 python3 -m http.server 8080 --directory dist
+# Open http://localhost:8080
+node tests/physics.cjs
 ```
 
-Open http://localhost:8080. WASD/arrows drive, Q/E rotate, I toggles intake, Space shoots, P pauses. Click the field after editing a control to return keyboard focus. Touch controls are available on small screens.
+## Controls
 
-The workshop changes drive speed, acceleration, chassis dimensions, intake/feed rate, capacity and stationary/moving shot spread. Profiles can be saved locally. Blue/red alliance selection resets the practice session. Both hubs are always active.
+- WASD: camera-relative swerve movement; W/S forward/back and A/D turn for tank.
+- Left/Right arrows or Q/E: turn the chassis.
+- Space: shoot at your hub from your alliance zone; otherwise pass to the marked home-zone landing area.
+- I: toggle intake. Tab: select the next robot. P: pause.
+- Scroll: zoom. Free orbit camera allows dragging.
+- Menus: Robots adds/selects/removes robots; Settings edits and saves a team build.
 
-## Implementation
+AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. Up to six robots, at most three per alliance, can be placed before a match. Only the selected robot is driven; the others remain parked physical obstacles. Builds save per team in browser localStorage under `fma-team-builds-v1`. Reset to edit or add/remove robots.
 
-- `dist/physics.js`: fixed-step simulation in meters and seconds, acceleration-limited drive, circular collision envelope around rectangular chassis, walls/hubs, ramp speed reduction, directional intake and cooldowns, discrete inventory, gravity and bounced fuel, aim compensation and speed/distance-dependent shot spread.
-- `dist/app.js`: keyboard/touch input, workshop and local profile persistence.
-- `dist/view3d.js`: Three.js field, robot and fuel rendering; overview, follow and top-down cameras. Drag to orbit and scroll to zoom in overview mode.
-- `dist/style.css`: responsive driver station UI.
+## Robot archetypes
 
-This is a REBUILT-inspired practice prototype, not an official game implementation. Field obstacle geometry is approximate; no climbing, hub phase rules, robot-to-robot collisions, ball-to-ball contacts, or detailed roller dynamics. Accuracy sliders control dispersion, not a guaranteed success percentage. Team names come from the FIRST Mid-Atlantic directory; all preset capabilities and robot shapes are fictional examples, not measurements or rankings.
+Turret: independent swivel aim and motion compensation.
 
-References: https://frc-events.firstinspires.org/2026/district/FMA and https://firstfrc.blob.core.windows.net/frc2026/Manual/HTML/2026GameManual.htm
+Big dumper: fixed, fast chassis-aim shooter with 1–6 parallel lanes. It can shoot while moving; the moving-accuracy slider controls dispersion. A lane volley shares the configured total feed rate. Five lanes at 25 fuel/s produce five-ball volleys at five volleys/second, not 125 fuel/s. Feed and intake limits are 25 fuel/s. Both chassis styles use generic boxes with yellow fill increasing in height and intensity with inventory.
 
-Run physics checks with `node tests/physics.cjs`.
+## Match behavior
+
+- 20-second AUTO, followed by a 3-second scoring delay.
+- 140-second TELEOP: 10-second transition, four 25-second alternating hub shifts, 30-second end game.
+- AUTO fuel winner is inactive in shift 1. Ties use a random order. Both hubs are active in AUTO, transition and end game.
+- Three seconds of scoring grace after hub deactivation and at the match end.
+- Active, eligible fuel earns one point. Hub entries recycle from four neutral-facing exits even when inactive.
+- Standard 504-fuel setup: 48 in depots, 48 stored in outposts, up to eight preloads per robot; unused robot preloads join the compact neutral-zone pile. One eight-fuel robot gives 400 center fuel; six give 360.
+
+## Physics and geometry
+
+SI units, 120 Hz base stepping with adaptive contact substeps so high-speed fuel moves less than 0.55 ball radii per substep. Spatially hashed sphere contacts, restitution, gravity, impact/rolling losses, and relative-velocity moving-chassis contacts. Robot footprints use oriented-box contacts. Shot spread depends on range, chassis pitch, and speed. Passing uses ballistic trajectories to an alliance-zone landing target. Fuel and inventory are conserved through capture, capacity changes, scoring and recycling.
+
+Bumps have sloping faces, approximately 15 degrees, 1.128 m travel depth, 1.854 m width and 0.1654 m crest height. Wheel contact samples raise/pitch/roll the chassis. Trenches have 0.5652 m clearance and 1.279 m usable lane width; tall robots cannot pass. Towers have a traversable base, separate upright, brace and rung collision volumes; rung heights are 0.6858, 1.143 and 1.6002 m. Robots and fuel collide with these structures at their actual modeled heights.
+
+This is a practice simulator, not a full rigid-body FRC digital twin. Tower depth placement and brace contact volumes are approximations; suspension, hub netting, ball deformation, and distribution are simplified. Climbing and climb scoring, fouls, ranking points, AI robots and human-player feeding are not implemented. Outpost reserves remain stored. Team names are real; all robot performance presets are illustrative, not scouting measurements. Accuracy settings tune spread rather than guarantee a score percentage.
+
+## Source
+
+- `dist/physics.js`: match state, fleet, geometry constants and simulation.
+- `dist/view3d.js`: Three.js models, instanced fuel and camera views.
+- `dist/app.js`: input, menus, team build persistence and HUD.
+- `tests/physics.cjs`: timing, setup, recycling, passing, high-speed contacts, lane rate, tower clearance, fleet and full-match conservation checks.
+
+References:
+- https://firstfrc.blob.core.windows.net/frc2026/Manual/HTML/2026GameManual.htm (§5.4–5.8, §6.3–6.5)
+- https://frc-events.firstinspires.org/2026/district/FMA
