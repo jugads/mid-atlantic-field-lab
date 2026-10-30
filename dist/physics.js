@@ -190,7 +190,8 @@
       const fl=terrainHeight(r.x+ca*l-sa*w,r.y+sa*l+ca*w),fr=terrainHeight(r.x+ca*l+sa*w,r.y+sa*l-ca*w),
         bl=terrainHeight(r.x-ca*l-sa*w,r.y-sa*l+ca*w),br=terrainHeight(r.x-ca*l+sa*w,r.y-sa*l-ca*w);
       const height=(fl+fr+bl+br)/4,pitch=Math.atan2((fl+fr-bl-br)/2,2*l),roll=Math.atan2((fl+bl-fr-br)/2,2*w);
-      const alpha=dt>0?1-Math.exp(-16*dt):1;
+      // Follow the wheel heights quickly enough to stay grounded at full driving speed.
+      const alpha=dt>0?1-Math.exp(-32*dt):1;
       r.z+=(height-r.z)*alpha;r.pitch+=(pitch-r.pitch)*alpha;r.roll+=(roll-r.roll)*alpha;
     }
     fire(limit=Infinity){
@@ -251,10 +252,9 @@
       let turn=clamp(((input.clockwise?1:0)-(input.counterclockwise?1:0))+(input.turnAxis||0),-1,1);
       if(c.drive==='tank'){turn=clamp(turn+(input.right?1:0)-(input.left?1:0)+(input.tankTurn||0),-1,1);const f=clamp(input.forward??((input.up?1:0)-(input.down?1:0)),-1,1);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
       r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
-      const bumpFactor=clamp(Math.max(r.z,terrainHeight(r.x,r.y))/FIELD.bumpHeight,0,1);
       // Shooting and passing limit drive speed to 30% while fuel is available.
       r.shootingSpeedLimited=!!input.shoot&&this.inventory>0;
-      const max=c.maxSpeed*(1-.22*bumpFactor)*(r.shootingSpeedLimited?.3:1);
+      const max=c.maxSpeed*(r.shootingSpeedLimited?.3:1);
       // Brake into the lower shooting limit, and when the stick is neutral.
       const braking=Math.max(12,c.acceleration*3);
       const slowingForShot=r.shootingSpeedLimited&&Math.hypot(r.vx,r.vy)>max;

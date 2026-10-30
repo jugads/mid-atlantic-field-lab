@@ -163,6 +163,11 @@ test('bump height and pitch transition smoothly without snapping',()=>{
  for(let i=0;i<120;i++)s.updatePose(1/120);assert(s.robot.z>first*3);assert(s.robot.pitch>0);
  assert.equal(terrainHeight(b.x-b.width/2,b.y),0);
 });
+test('bump traversal maintains drive speed and settles quickly afterward',()=>{
+ const s=empty(),b=bumps[0];s.start();Object.assign(s.robot,{x:b.x-1.3,y:b.y,z:0,a:0,vx:5,vy:0});
+ let minSpeed=5;for(let i=0;i<64;i++){s.step(1/120,{right:true});minSpeed=Math.min(minSpeed,s.robot.vx);}
+ assert(minSpeed>4.99);assert(s.robot.x>b.x+1.2);assert(s.robot.z<.01);assert(Math.abs(s.robot.pitch)<.03);
+});
 test('built-in robots start at a matching trench or bump',()=>{
  for(const team of ['341','316','1391','8513']){
    const c=resolvePreset(team),s=new Simulation(c,()=>.5),r=s.robot;

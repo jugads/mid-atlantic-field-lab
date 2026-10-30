@@ -128,10 +128,16 @@ export class FieldView {
     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(l*.89,h-.22,w*.89)),new T.LineBasicMaterial({color:'#c4cbb4',transparent:true,opacity:.45}));
     outline.position.y=.23+(h-.22)/2;group.add(outline);
     const fill=this.box(l*.83,1,w*.83,0,.23,0,'#e4c646',group);fill.castShadow=false;
-    // A shallow protruding intake with side rails and a bright roller marks the front.
-    const intakeBar=this.box(.22,.08,w*.82,l/2+.11,.13,0,'#d0ed93',group);
-    for(const side of [-1,1])this.box(.23,.11,.035,l/2+.11,.17,side*w*.41,'#748a61',group);
-    const roller=this.cylinder(.045,.045,w*.78,l/2+.2,.19,0,'#efffb5',group);roller.rotation.x=Math.PI/2;
+    // An extended, labeled intake stays visible from the follow camera.
+    const intakeBar=this.box(.32,.10,w*.88,l/2+.16,.14,0,'#c8a5ff',group);
+    for(const side of [-1,1])this.box(.34,.15,.055,l/2+.17,.19,side*w*.44,'#eee5f7',group);
+    const roller=this.cylinder(.065,.065,w*.82,l/2+.31,.21,0,'#f5edff',group);roller.rotation.x=Math.PI/2;
+    const intakeCanvas=document.createElement('canvas');intakeCanvas.width=512;intakeCanvas.height=128;
+    const intakeCtx=intakeCanvas.getContext('2d');intakeCtx.fillStyle='#342043';intakeCtx.fillRect(0,0,512,128);
+    intakeCtx.fillStyle='#ffffff';intakeCtx.font='bold 62px sans-serif';intakeCtx.textAlign='center';intakeCtx.fillText('INTAKE',256,86);
+    const intakeTexture=new T.CanvasTexture(intakeCanvas);intakeTexture.colorSpace=T.SRGBColorSpace;
+    const intakeLabel=new T.Mesh(new T.PlaneGeometry(w*.7,.29),new T.MeshBasicMaterial({map:intakeTexture}));
+    intakeLabel.rotation.x=-Math.PI/2;intakeLabel.rotation.z=-Math.PI/2;intakeLabel.position.set(l/2+.16,.196,0);group.add(intakeLabel);
     const cv=document.createElement('canvas');cv.width=512;cv.height=160;const ct=cv.getContext('2d');
     ct.fillStyle=color;ct.fillRect(0,0,512,160);ct.fillStyle='#fff';ct.strokeStyle='#111';ct.lineWidth=8;
     ct.textAlign='center';ct.font='bold 124px sans-serif';ct.strokeText(c.team,256,125);ct.fillText(c.team,256,125);
@@ -174,7 +180,7 @@ export class FieldView {
     const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
-    this.chassis.rotation.set(r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#d0ed93':'#596350');
+    this.chassis.rotation.set(r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
     const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:r.a;this.updateFill(this.activeVisual,c,sim.inventory);
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
