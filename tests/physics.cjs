@@ -89,7 +89,7 @@ test('0% SOTM profiles miss while moving but still shoot normally when stationar
   const c={...resolvePreset(team),autoAim:false,stationary:100},s=empty(c);s.robot.vx=2;s.robot.a=0;s.inventory=8;
   s.fire();const target=s.target, b=s.balls[0],d=Math.hypot(target.x-s.robot.x,target.y-s.robot.y),t=s.shotSolution.flight;
   assert(Math.hypot(b.x+b.vx*t-target.x,b.y+b.vy*t-target.y)>FIELD.openingRadius+BR,team+' should miss when moving');
-  const stopped=empty(c);stopped.robot.a=Math.atan2(stopped.target.y-stopped.robot.y,stopped.target.x-stopped.robot.x);stopped.inventory=8;stopped.fire();
+  const stopped=empty(c);stopped.robot.a=Math.atan2(stopped.target.y-stopped.robot.y,stopped.target.x-stopped.robot.x)-(c.shooterDirection==='back'?Math.PI:0);stopped.inventory=8;stopped.fire();
   const q=stopped.balls[0],distance=Math.hypot(stopped.target.x-stopped.robot.x,stopped.target.y-stopped.robot.y),tf=stopped.shotSolution.flight;
   assert(Math.hypot(q.x+q.vx*tf-stopped.target.x,q.y+q.vy*tf-stopped.target.y)<FIELD.openingRadius,team+' should retain stationary shooting');
  }
@@ -212,6 +212,18 @@ test('turret fires while moving without changing chassis heading',()=>{
 test('dumper rapidly aligns chassis and fires while moving',()=>{
  const s=empty({...ARCHETYPES.dumper.settings,stationary:100,moving:100});s.start();s.time=25;
  const initial=s.robot.a;advance(s,.35,{moveY:.25,shoot:true});assert(s.robot.a!==initial);assert(s.fired>0);assert(Math.hypot(s.robot.vx,s.robot.vy)>.15);
+});
+test('rear shooters aim and launch from the back when scoring and passing',()=>{
+ for(const team of ['316','8513'])for(const x of [2.5,W/2]){
+  const s=empty({...resolvePreset(team),stationary:100,moving:100});s.start();s.time=25;
+  Object.assign(s.robot,{x,y:2,a:0,vx:0,vy:0});s.inventory=8;advance(s,.5,{shoot:true});
+  assert(s.fired+s.passed>0,team+' should fire');
+  const b=s.balls.find(b=>b.shot||b.pass);assert(b,team+' should launch fuel');
+  const target=s.shotSolution.target;assert((b.vx*(target.x-b.x)+b.vy*(target.y-b.y))>0,team+' should shoot toward target');
+  assert.equal(s.config.shooterDirection,'back');
+ }
+ const s=empty({...resolvePreset('316'),autoAim:false,stationary:100});s.robot.a=0;s.inventory=1;s.fire();
+ assert(s.balls[0].x<s.robot.x);assert(s.balls[0].vx<0);
 });
 test('dumper lanes produce distinct parallel launch origins',()=>{
  const s=empty({...ARCHETYPES.dumper.settings,lanes:4,autoAim:false});s.inventory=8;

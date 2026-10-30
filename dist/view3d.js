@@ -128,35 +128,25 @@ export class FieldView {
     const outline=new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(l*.89,h-.22,w*.89)),new T.LineBasicMaterial({color:'#c4cbb4',transparent:true,opacity:.45}));
     outline.position.y=.23+(h-.22)/2;group.add(outline);
     const fill=this.box(l*.83,1,w*.83,0,.23,0,'#e4c646',group);fill.castShadow=false;
-    // An extended, labeled intake stays visible from the follow camera.
-    const intakeBar=this.box(.32,.10,w*.88,l/2+.16,.14,0,'#c8a5ff',group);
-    for(const side of [-1,1])this.box(.34,.15,.055,l/2+.17,.19,side*w*.44,'#eee5f7',group);
-    const roller=this.cylinder(.065,.065,w*.82,l/2+.31,.21,0,'#f5edff',group);roller.rotation.x=Math.PI/2;
-    const intakeCanvas=document.createElement('canvas');intakeCanvas.width=512;intakeCanvas.height=128;
-    const intakeCtx=intakeCanvas.getContext('2d');intakeCtx.fillStyle='#342043';intakeCtx.fillRect(0,0,512,128);
-    intakeCtx.fillStyle='#ffffff';intakeCtx.font='bold 62px sans-serif';intakeCtx.textAlign='center';intakeCtx.fillText('INTAKE',256,86);
-    const intakeTexture=new T.CanvasTexture(intakeCanvas);intakeTexture.colorSpace=T.SRGBColorSpace;
-    const intakeLabel=new T.Mesh(new T.PlaneGeometry(w*.7,.29),new T.MeshBasicMaterial({map:intakeTexture}));
-    intakeLabel.rotation.x=-Math.PI/2;intakeLabel.rotation.z=-Math.PI/2;intakeLabel.position.set(l/2+.16,.196,0);group.add(intakeLabel);
+    // A modest roller and two short side rails identify the intake end.
+    const intakeBar=this.box(.14,.07,w*.7,l/2+.07,.14,0,'#c8a5ff',group);
+    for(const side of [-1,1])this.box(.14,.08,.025,l/2+.07,.16,side*w*.35,'#a59bb0',group);
+    const roller=this.cylinder(.035,.035,w*.66,l/2+.13,.18,0,'#e6dcef',group);roller.rotation.x=Math.PI/2;
     const cv=document.createElement('canvas');cv.width=512;cv.height=160;const ct=cv.getContext('2d');
     ct.fillStyle=color;ct.fillRect(0,0,512,160);ct.fillStyle='#fff';ct.strokeStyle='#111';ct.lineWidth=8;
     ct.textAlign='center';ct.font='bold 124px sans-serif';ct.strokeText(c.team,256,125);ct.fillText(c.team,256,125);
     const tex=new T.CanvasTexture(cv);tex.colorSpace=T.SRGBColorSpace;
-    // Large, high-contrast labels on all four bumper faces.
-    for(const sign of [-1,1]){
-      const tag=new T.Mesh(new T.PlaneGeometry(l*.85,.15),new T.MeshBasicMaterial({map:tex}));
-      tag.position.set(0,.16,sign*(w/2+.003));if(sign<0)tag.rotation.y=Math.PI;group.add(tag);
-      const end=new T.Mesh(new T.PlaneGeometry(w*.75,.15),new T.MeshBasicMaterial({map:tex}));
-      end.position.set(sign*(l/2+.003),.16,0);end.rotation.y=sign*Math.PI/2;group.add(end);
-    }
-    // A small number plate on top remains readable from the follow camera.
-    const top=new T.Mesh(new T.PlaneGeometry(l*.50,w*.22),new T.MeshBasicMaterial({map:tex}));
-    top.rotation.x=-Math.PI/2;top.position.set(-l*.12,h+.006,0);group.add(top);
+    // A single small bumper number and a simple shooter block keep the robot readable.
+    const tag=new T.Mesh(new T.PlaneGeometry(l*.48,.10),new T.MeshBasicMaterial({map:tex}));
+    tag.position.set(0,.16,w/2+.003);group.add(tag);
+    const shooter=new T.Group();group.add(shooter);
+    const back=c.shooterDirection==='back',direction=back?-1:1;
+    shooter.position.set(c.archetype==='dumper'?direction*l*.30:0,h+.025,0);
+    this.box(.18,.09,w*.32,0,.045,0,'#a99bb8',shooter);
     if(c.archetype==='dumper')for(let lane=0;lane<(c.lanes||1);lane++){
-      const offset=laneOffset(lane,c.lanes,w);
-      this.box(.018,.055,.08,l/2+.003,h-.07,offset,'#152019',group);
-    }
-    return {body,fill,intakeBar};
+      this.box(.12,.055,.055,direction*.12,.055,laneOffset(lane,c.lanes,w),'#eee7f5',shooter);
+    }else this.box(.18,.06,.09,.15,.06,0,'#eee7f5',shooter);
+    return {body,fill,intakeBar,shooter};
   }
   updateFill(visual,config,inventory){
     const fraction=Math.max(0,Math.min(1,inventory/config.capacity));
@@ -166,7 +156,7 @@ export class FieldView {
   }
   rebuildRobot(c){
     this.disposeGroup(this.chassis);this.activeVisual=this.genericRobot(this.chassis,c);this.intakeBar=this.activeVisual.intakeBar;
-    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes].join('|');
+    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection].join('|');
   }
   setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;}
   resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
@@ -177,15 +167,16 @@ export class FieldView {
     return {moveX:right.x*x-forward.x*y,moveY:right.z*x-forward.z*y};
   }
   draw(sim,grid){
-    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes].join('|');
+    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
     this.chassis.rotation.set(r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
-    const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:r.a;this.updateFill(this.activeVisual,c,sim.inventory);
+    const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:sim.shooterAngle;this.updateFill(this.activeVisual,c,sim.inventory);
+    if(c.archetype==='turret')this.activeVisual.shooter.rotation.y=-(aim-r.a);
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
       if(index===sim.activeIndex)return;parkedKeys.add(index);
-      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes].join('|');
+      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection].join('|');
       let visual=this.parkedVisuals.get(index);
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
       visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
@@ -202,9 +193,10 @@ export class FieldView {
     const passing=solution.passing,points=[],d=solution.reach,flight=solution.flight,launch=r.z+c.height-.05;
     const vz=(target.z-launch+.5*9.81*flight*flight)/flight;
     const manual=!c.autoAim||c.archetype==='dumper';
-    const power=Math.hypot(target.x-r.x-r.vx*flight,target.y-r.y-r.vy*flight)/flight;
+    const origin=sim.shooterOrigin,power=Math.hypot(target.x-origin.x-r.vx*flight,target.y-origin.y-r.vy*flight)/flight;
     const vx=manual?Math.cos(aim)*power+r.vx:(target.x-r.x)/flight,vy=manual?Math.sin(aim)*power+r.vy:(target.y-r.y)/flight;
-    for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+vx*t,launch+vz*t-4.905*t*t,z+vy*t));}
+    const muzzle=c.archetype==='dumper'?(c.shooterDirection==='back'?-1:1)*c.length*.30:0;
+    for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+Math.cos(r.a)*muzzle+vx*t,launch+vz*t-4.905*t*t,z+Math.sin(r.a)*muzzle+vy*t));}
     this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#c8a5ff');
     this.passMarker.visible=passing;this.passMarker.position.set(target.x-W/2,.025,target.y-H/2);
     const side=c.alliance==='blue'?-1:1,fit=this.camera.aspect<1.25?1.2:1;

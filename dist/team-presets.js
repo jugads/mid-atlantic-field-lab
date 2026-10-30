@@ -10,10 +10,10 @@
     // Very short and high SOTM are approximated as 0.40 m and 90%.
     '341':{archetype:'turret',height:.4,capacity:8,feedRate:10,intakeRate:15,moving:90},
     // 0.55 m clears the 0.5652 m trench. Unspecified dimensions use dumper defaults.
-    '316':{archetype:'dumper',height:.55,capacity:50,feedRate:20,lanes:3,intakeRate:32,moving:75},
+    '316':{shooterDirection:'back',archetype:'dumper',height:.55,capacity:50,feedRate:20,lanes:3,intakeRate:32,moving:75},
     '1391':{archetype:'dumper',height:.55,capacity:45,feedRate:15,lanes:4,intakeRate:20,moving:0,maxRange:3.7},
     // The 2026 robot height limit is 30 inches (0.762 m). Lane count defaults to three.
-    '8513':{archetype:'dumper',height:.762,capacity:80,feedRate:20,intakeRate:30,moving:0}
+    '8513':{shooterDirection:'back',archetype:'dumper',height:.762,capacity:80,feedRate:20,intakeRate:30,moving:0}
   };
   function resolve(team,alliance='blue'){
     const p=profiles[team];if(!p)return null;

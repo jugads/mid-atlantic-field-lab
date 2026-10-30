@@ -1,4 +1,4 @@
-import {FieldView} from './view3d.js?v=intakebump1';
+import {FieldView} from './view3d.js?v=shooter1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
@@ -17,7 +17,7 @@ function createChoices(){
   for(const team of teams){
     const c=resolvePreset(team),button=document.createElement('button');button.type='button';button.className='robot-choice';button.dataset.team=team;
     button.setAttribute('aria-label',`Team ${team}, ${names[team]}, ${ARCHETYPES[c.archetype].label}, ${c.capacity} fuel capacity`);
-    button.innerHTML=`<span class="choice-top"><span class="choice-number">${team}</span><span class="choice-check" aria-hidden="true">✓</span></span><strong>${names[team]}</strong><span class="choice-type">${ARCHETYPES[c.archetype].label}</span><span class="choice-stats"><span><b>${c.capacity}</b> CAPACITY</span><span><b>${c.feedRate}/s</b> SHOOT</span><span><b>${c.intakeRate}/s</b> INTAKE</span></span><span class="choice-details">${c.maxRange.toFixed(1)} m range · ${c.moving}% moving accuracy</span><span class="choice-start">Starts at ${canUseTrench(c)?'trench':'bump'}</span>`;
+    button.innerHTML=`<span class="choice-top"><span class="choice-number">${team}</span><span class="choice-check" aria-hidden="true">✓</span></span><strong>${names[team]}</strong><span class="choice-type">${ARCHETYPES[c.archetype].label}</span><span class="choice-stats"><span><b>${c.capacity}</b> CAPACITY</span><span><b>${c.feedRate}/s</b> SHOOT</span><span><b>${c.intakeRate}/s</b> INTAKE</span></span><span class="choice-details">${c.maxRange.toFixed(1)} m range · ${c.moving}% moving accuracy · ${c.shooterDirection==='back'?'Rear':'Front'} shooter</span><span class="choice-start">Starts at ${canUseTrench(c)?'trench':'bump'}</span>`;
     button.onclick=()=>selectRobot(team);$('robotChoices').append(button);
   }
 }

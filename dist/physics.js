@@ -4,7 +4,7 @@
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const base = {maxSpeed:5, acceleration:10, width:.85, length:.9, height:.52,
     intakeRate:5, feedRate:6, capacity:30, stationary:92, moving:65, maxRange:6,
-    drive:'swerve', alliance:'blue', autoAim:true, team:'341', autoRoutine:'preload', archetype:'turret',lanes:1};
+    drive:'swerve', alliance:'blue', autoAim:true, team:'341', autoRoutine:'preload', archetype:'turret',lanes:1,shooterDirection:'front'};
   const ARCHETYPES = {
     turret: {label:'Turret',description:'Swiveling shooter · fire while moving',settings:{archetype:'turret',width:.85,length:.9,height:.52,capacity:30,feedRate:6,intakeRate:5,maxSpeed:5,acceleration:10,stationary:92,moving:65,lanes:1}},
     dumper: {label:'Big dumper',description:'Fixed multi-lane shooter · chassis aim · moving accuracy',settings:{archetype:'dumper',width:1,length:1.05,height:.72,capacity:60,feedRate:12,intakeRate:9,maxSpeed:5,acceleration:10,stationary:95,moving:40,lanes:3}}
@@ -128,12 +128,16 @@
       const flight=passing?clamp(d/5.2,1.05,2.25):clamp(.75+reach*.15,.9,2.25);
       return {target,actualTarget:h,distance:d,reach,flight,passing,outOfRange:!passing&&d>this.config.maxRange+.001};
     }
-    get aimAngle(){const {target,flight}=this.shotSolution,r=this.robot;
-      return Math.atan2(target.y-r.y-r.vy*flight,target.x-r.x-r.vx*flight);}
+    get shooterOrigin(){const r=this.robot,c=this.config,forward=c.archetype==='dumper'?(c.shooterDirection==='back'?-1:1)*c.length*.30:0;
+      return {x:r.x+Math.cos(r.a)*forward,y:r.y+Math.sin(r.a)*forward};}
+    get aimAngle(){const {target,flight}=this.shotSolution,r=this.robot,o=this.shooterOrigin;
+      return Math.atan2(target.y-o.y-r.vy*flight,target.x-o.x-r.vx*flight);}
+    get chassisAimAngle(){return this.aimAngle-(this.config.shooterDirection==='back'?Math.PI:0);}
+    get shooterAngle(){return this.robot.a+(this.config.shooterDirection==='back'?Math.PI:0);}
     get fireStatus(){
       if(!this.inventory)return 'EMPTY';
       if(this.config.archetype==='dumper'){
-        const error=Math.atan2(Math.sin(this.aimAngle-this.robot.a),Math.cos(this.aimAngle-this.robot.a));
+        const error=Math.atan2(Math.sin(this.chassisAimAngle-this.robot.a),Math.cos(this.chassisAimAngle-this.robot.a));
         if(this.config.autoAim&&Math.abs(error)>.07)return 'ALIGNING CHASSIS';
       }
       if(this.shotSolution.outOfRange)return 'OUT OF RANGE';
@@ -206,12 +210,13 @@
       for(let i=0;i<count;i++){
         const lane=(startLane+i)%lanes;
         const offset=laneOffset(lane,lanes,c.width);
-        const ox=r.x-Math.sin(r.a)*offset,oy=r.y+Math.cos(r.a)*offset;
+        const forward=c.archetype==='dumper'?(c.shooterDirection==='back'?-1:1)*c.length*.30:0;
+        const ox=r.x+Math.cos(r.a)*forward-Math.sin(r.a)*offset,oy=r.y+Math.sin(r.a)*forward+Math.cos(r.a)*offset;
         const ex=gaussian()*sigma*(.7+d/5),ey=gaussian()*sigma*(.7+d/5);
         let vx=(h.x-ox+ex)/t,vy=(h.y-oy+ey)/t;
         if(!c.autoAim||c.archetype==='dumper'){
-          const magnitude=Math.hypot(h.x-r.x-r.vx*t,h.y-r.y-r.vy*t)/t;
-          vx=Math.cos(r.a)*magnitude+r.vx+ex/t;vy=Math.sin(r.a)*magnitude+r.vy+ey/t;
+          const magnitude=Math.hypot(h.x-ox-r.vx*t,h.y-oy-r.vy*t)/t;
+          vx=Math.cos(this.shooterAngle)*magnitude+r.vx+ex/t;vy=Math.sin(this.shooterAngle)*magnitude+r.vy+ey/t;
         }
         // 0% SOTM means a moving scoring shot cannot land in the hub opening.
         // Passing still works; once stopped, the normal stationary spread applies.
@@ -334,7 +339,7 @@
       this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
       if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise&&Math.abs(control.turnAxis||0)<.01&&Math.abs(control.tankTurn||0)<.01){
-        const error=Math.atan2(Math.sin(this.aimAngle-r.a),Math.cos(this.aimAngle-r.a));
+        const error=Math.atan2(Math.sin(this.chassisAimAngle-r.a),Math.cos(this.chassisAimAngle-r.a));
         const rotation=clamp(error,-12*dt,12*dt);r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose(dt);
       }
       // The configured rate is the average total output across all lanes. Dumpers
