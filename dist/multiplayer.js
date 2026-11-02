@@ -1,6 +1,6 @@
 /* The room host simulates; the server relays guest controls and host snapshots. */
 export class MultiplayerClient{
-  constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;this.hostSim=null;this.guestInput={};this.guestInputAt=0;this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;this.lastSnapshot=0;}
+  constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;this.hostSim=null;this.guestInput={};this.guestInputAt=0;this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;this.lastSnapshot=0;this.visualRobot=null;this.visualAt=0;}
   get active(){return !!this.room;}
   get self(){return this.room?.players.find(p=>p.id===this.id);}
   normalizeEndpoint(value){
@@ -28,10 +28,10 @@ export class MultiplayerClient{
           this.hostSim=new Simulation();this.hostSim.enableMultiplayer(msg.players.map(p=>resolve(p.team,p.alliance)));
           this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;
         }
-        if(prior?.status!==msg.status){this.hostLast=0;this.hostAccumulator=0;this.guestInput={};}
+        if(prior?.status!==msg.status){this.hostLast=0;this.hostAccumulator=0;this.guestInput={};this.visualRobot=null;}
       }
       if(msg.type==='guest_input'){this.guestInput=msg.input;this.guestInputAt=performance.now();return;}
-      if(msg.type==='snapshot'){if(this.frames.length&&msg.time<this.frames.at(-1).data.time)this.frames=[];this.frames.push({at:performance.now(),data:msg});if(this.frames.length>6)this.frames.shift();}
+      if(msg.type==='snapshot'){if(this.frames.length&&msg.time<this.frames.at(-1).data.time)this.frames=[];this.frames.push({at:performance.now(),data:msg});if(this.frames.length>8)this.frames.shift();return;}
       if(msg.type==='notice')this.message=msg.message;
       if(msg.type==='pong'){this.rtt=Math.round(performance.now()-msg.sent);return;}
       if(msg.type==='error'){
@@ -53,9 +53,9 @@ export class MultiplayerClient{
       this.onChange();
     };
   }
-  send(msg){if(this.socket?.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify(msg));}
+  send(msg){if(this.socket?.readyState===WebSocket.OPEN&&(msg.type!=='snapshot'||this.socket.bufferedAmount<131072))this.socket.send(JSON.stringify(msg));}
   leave(notify=true){
-    if(notify){this.send({type:'leave'});this.message='You left the room.';}++this.epoch;clearTimeout(this.timer);this.socket?.close();this.socket=null;this.room=null;this.id=null;this.token=null;this.frames=[];this.hostSim=null;this.hostLast=0;this.guestInput={};this.state='offline';this.onChange();
+    if(notify){this.send({type:'leave'});this.message='You left the room.';}++this.epoch;clearTimeout(this.timer);this.socket?.close();this.socket=null;this.room=null;this.id=null;this.token=null;this.frames=[];this.hostSim=null;this.hostLast=0;this.guestInput={};this.visualRobot=null;this.state='offline';this.onChange();
   }
   input(input,now){
     if(this.state!=='connected')return;
@@ -85,9 +85,11 @@ export class MultiplayerClient{
   }
   apply(sim,now,input={}){
     if(!this.frames.length)return;
-    const renderAt=now-50;
+    const isHost=this.room?.hostId===this.id;
+    const renderAt=now-100;
     let a=this.frames[0],b=this.frames.at(-1);
-    for(let i=1;i<this.frames.length;i++)if(this.frames[i].at>=renderAt){a=this.frames[i-1];b=this.frames[i];break;}
+    if(isHost)a=b;
+    else for(let i=1;i<this.frames.length;i++)if(this.frames[i].at>=renderAt){a=this.frames[i-1];b=this.frames[i];break;}
     const f=a===b?1:Math.max(0,Math.min(1,(renderAt-a.at)/(b.at-a.at))),data=b.data;
     const lerp=(x,y)=>x+(y-x)*f;
     const angle=(x,y)=>x+Math.atan2(Math.sin(y-x),Math.cos(y-x))*f;
@@ -105,12 +107,23 @@ export class MultiplayerClient{
     // the server. Scoring, fuel, and all authoritative state still come from snapshots.
     // Bound prediction to keep a delayed connection from driving through obstacles.
     const latest=this.frames.at(-1),latestMe=latest.data.fleet[sim.activeIndex];
-    if(latestMe&&this.state==='connected'&&this.room?.status==='playing'&&latest.data.running&&sim.controlsEnabled){
+    if(!isHost&&latestMe&&now-latest.at<250&&this.state==='connected'&&this.room?.status==='playing'&&latest.data.running&&sim.controlsEnabled){
       Object.assign(me.robot,latestMe.robot);
       let lead=Math.min(.15,Math.max(0,(now-latest.at+this.rtt/2)/1000));
       const lock=input.shoot&&me.inventory>0&&me.config.autoAim&&me.config.archetype==='dumper'&&me.config.aimLockWhileShooting;
       const controls=lock?{...input,clockwise:false,counterclockwise:false,turnAxis:0,tankTurn:0}:input;
       while(lead>1e-6){const dt=Math.min(lead,1/120);sim.drive(dt,controls);lead-=dt;}
+      const target={...me.robot},dt=Math.max(0,Math.min(.05,(now-this.visualAt)/1000));
+      if(this.visualRobot&&now-this.visualAt<150&&Math.hypot(target.x-this.visualRobot.x,target.y-this.visualRobot.y)<1.2){
+        Object.assign(me.robot,this.visualRobot);
+        let remaining=dt;while(remaining>1e-6){const step=Math.min(remaining,1/120);sim.drive(step,controls);remaining-=step;}
+        const correction=1-Math.exp(-8*dt);
+        for(const key of ['x','y','z','vx','vy','pitch','roll'])me.robot[key]+=(target[key]-me.robot[key])*correction;
+        me.robot.a+=Math.atan2(Math.sin(target.a-me.robot.a),Math.cos(target.a-me.robot.a))*correction;
+      }
+      this.visualRobot={...me.robot};this.visualAt=now;
+    }else{
+      this.visualRobot=null;
     }
     const previous=new Map(a.data.balls.map(ball=>[ball[0],ball]));
     sim.balls=data.balls.map(ball=>{const old=previous.get(ball[0])||ball;return {x:lerp(old[1],ball[1]),y:lerp(old[2],ball[2]),z:lerp(old[3],ball[3])};});
