@@ -47,7 +47,7 @@ test('room requires exactly two ready players and a server countdown',()=>{
 test('private rooms reject a third player, invalid teams, and untrusted config',()=>{
  const {rooms,a,room}=lobby();const c=socket();rooms.handle(c,{type:'join',code:room.code});assert.equal(c.messages.at(-1).type,'error');assert.equal(room.players.length,2);
  rooms.handle(a,{type:'select',team:'unknown',capacity:999});assert.equal(a.player.team,'341');
- rooms.handle(a,{type:'select',team:'193',netEnabled:true,feedRate:999});rooms.handle(a,{type:'ready',ready:true});rooms.handle(room.players[1].socket,{type:'ready',ready:true});assert.equal(room.sim.fleet[0].config.capacity,90);assert.equal(room.sim.fleet[0].config.feedRate,20);
+ rooms.handle(a,{type:'select',team:'193',feedRate:999});rooms.handle(a,{type:'ready',ready:true});rooms.handle(room.players[1].socket,{type:'ready',ready:true});assert.equal(room.sim.fleet[0].config.capacity,80);assert.equal(room.sim.fleet[0].config.feedRate,20);
 });
 test('changing a build clears both ready votes',()=>{const {rooms,a,b}=lobby();rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'select',team:'1391'});assert(!a.player.ready);assert(!b.player.ready);});
 test('stale controls stop movement and disabled intake cannot collect',()=>{

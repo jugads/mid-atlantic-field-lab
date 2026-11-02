@@ -90,17 +90,17 @@ test('releasing drive controls applies strong braking without changing accelerat
 test('user-supplied team builds resolve with the requested specifications',()=>{
  const p341=resolvePreset('341'),p316=resolvePreset('316'),p1391=resolvePreset('1391'),p8513=resolvePreset('8513');
  assert.equal(Object.keys(profiles).length,7);
- assert.equal(p341.baseCapacity,8);assert.equal(p341.capacity,18);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
+ assert.equal(p341.capacity,8);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
- assert.equal(p316.baseCapacity,50);assert.equal(p316.capacity,60);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
- assert.equal(p1391.baseCapacity,45);assert.equal(p1391.capacity,55);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
- assert.equal(p8513.baseCapacity,80);assert.equal(p8513.capacity,90);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
+ assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
+ assert.equal(p1391.capacity,45);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
+ assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
  const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.intakeRate,35);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
- const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.baseCapacity,35);assert.equal(p9094.capacity,45);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
+ const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.capacity,35);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
 });
 test('5895 has two corner turrets, 40 total capacity and fits the trench',()=>{
- const c=resolvePreset('5895');assert.equal(c.archetype,'double_turret');assert.equal(c.capacity,40);assert.equal(c.baseCapacity,30);assert.equal(c.moving,80);assert(canUseTrench(c));
+ const c=resolvePreset('5895');assert.equal(c.archetype,'double_turret');assert.equal(c.capacity,40);assert.equal(c.moving,80);assert(canUseTrench(c));
  assert.equal(c.feedRate,14);assert.equal(c.intakeRate,32);const s=empty({...c,autoAim:true,stationary:100,moving:100});
  s.turretAngle=s.aimAngle;s.inventory=2;assert.equal(s.fire(1),1);assert.equal(s.fire(1),1);
  const [a,b]=s.balls;assert(Math.hypot(a.x-b.x,a.y-b.y)>.4,'shots originate at separate corners');
@@ -392,24 +392,16 @@ test('fleet preserves inventories and setup fuel count when adding/switching',()
  assert(s.addRobot({team:'2590',alliance:'blue'}));assert(!s.addRobot({team:'341',alliance:'blue'}));
  assert(s.addRobot({team:'2539',alliance:'red'}));assert.equal(total(s),504);
 });
-test('standard nets collapse when empty and block the trench when carrying extra fuel',()=>{
+test('trench clearance depends on robot height, not fuel inventory',()=>{
  for(const team of Object.keys(profiles)){
-  const c=resolvePreset(team);assert(c.netEnabled);assert.equal(c.capacity,profiles[team].capacity+10);
-  const s=new Simulation(c),tr=trenches[0];assert.equal(total(s),504);
-  assert.equal(canUseTrench(c,c.baseCapacity),c.height<=FIELD.trenchClearance);
-  assert(!canUseTrench(c,c.baseCapacity+1));
-  for(const inventory of [c.baseCapacity,c.baseCapacity+1,c.baseCapacity]){
+  const c=resolvePreset(team),s=new Simulation(c),tr=trenches[0];
+  assert.equal(c.capacity,profiles[team].capacity);assert.equal(total(s),504);
+  for(const inventory of [0,c.capacity]){
    s.inventory=inventory;Object.assign(s.robot,{x:tr.x,y:tr.y,z:0,a:0,vx:0,vy:0});s.resolveRobot();
-   if(c.height<=FIELD.trenchClearance&&inventory===c.baseCapacity)assert.equal(s.robot.x,tr.x,'empty net must clear the roof again');
-   else assert(Math.abs(s.robot.x-tr.x)>tr.width/2,'loaded net or tall body must collide');
+   if(canUseTrench(c))assert.equal(s.robot.x,tr.x,'short robot must clear the trench when full');
+   else assert(Math.abs(s.robot.x-tr.x)>tr.width/2,'tall robot must collide with the trench');
   }
  }
-});
-test('intaking beneath the trench cannot expand the net through the roof',()=>{
- const s=empty(resolvePreset('341')),tr=trenches[0];s.start();s.intake=true;s.inventory=s.config.baseCapacity;
- Object.assign(s.robot,{x:tr.x,y:tr.y,z:0,a:0});
- s.balls=[ball(tr.x+s.config.length/2+.1,tr.y)];advance(s,.1);assert.equal(s.inventory,s.config.baseCapacity);
- Object.assign(s.robot,{x:7,y:2,z:0,a:0});s.balls=[ball(7+s.config.length/2+.1,2)];advance(s,.1);assert.equal(s.inventory,s.config.baseCapacity+1);
 });
 if(!process.argv.includes('--quick'))test('full 166-second match keeps fuel conserved and positions finite',()=>{
  let seed=42;const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
