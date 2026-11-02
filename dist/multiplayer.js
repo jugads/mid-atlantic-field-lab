@@ -1,6 +1,6 @@
-/* Two-player client. Inputs go to the server; snapshots are the only world authority. */
+/* The room host simulates; the server relays guest controls and host snapshots. */
 export class MultiplayerClient{
-  constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;}
+  constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;this.hostSim=null;this.guestInput={};this.guestInputAt=0;this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;this.lastSnapshot=0;}
   get active(){return !!this.room;}
   get self(){return this.room?.players.find(p=>p.id===this.id);}
   normalizeEndpoint(value){
@@ -10,7 +10,7 @@ export class MultiplayerClient{
   }
   connect(endpoint,request){
     try{this.endpoint=this.normalizeEndpoint(endpoint);}catch(e){this.message=e.message;this.onChange();return;}
-    this.leave(false);this.intent=request;this.state='connecting';this.message='Connecting… A sleeping Render server may take a minute to wake.';this.connectAt=performance.now();this.open(false);this.onChange();
+    this.leave(false);this.intent={...request,protocol:2};this.state='connecting';this.message='Connecting… A sleeping Render server may take a minute to wake.';this.connectAt=performance.now();this.open(false);this.onChange();
   }
   open(resume){
     const generation=++this.epoch;this.socket=new WebSocket(this.endpoint);const socket=this.socket;
@@ -20,7 +20,17 @@ export class MultiplayerClient{
     socket.onmessage=e=>{
       if(generation!==this.epoch)return;this.lastMessage=performance.now();let msg;try{msg=JSON.parse(e.data);}catch{return;}
       if(msg.type==='welcome'){this.id=msg.id;this.token=msg.token;this.state='connected';this.message='';this.retry=0;}
-      if(msg.type==='room'){const prior=this.room;this.room=msg;if(prior?.status!==msg.status&&msg.status==='lobby')this.frames=[];}
+      if(msg.type==='room'){
+        const prior=this.room;this.room=msg;
+        if(msg.status==='lobby'&&prior?.status!=='lobby'){this.frames=[];this.hostSim=null;this.hostLast=0;}
+        if(msg.status==='countdown'&&msg.hostId===this.id&&!this.hostSim){
+          const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
+          this.hostSim=new Simulation();this.hostSim.enableMultiplayer(msg.players.map(p=>resolve(p.team,p.alliance)));
+          this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;
+        }
+        if(prior?.status!==msg.status){this.hostLast=0;this.hostAccumulator=0;this.guestInput={};}
+      }
+      if(msg.type==='guest_input'){this.guestInput=msg.input;this.guestInputAt=performance.now();return;}
       if(msg.type==='snapshot'){if(this.frames.length&&msg.time<this.frames.at(-1).data.time)this.frames=[];this.frames.push({at:performance.now(),data:msg});if(this.frames.length>6)this.frames.shift();}
       if(msg.type==='notice')this.message=msg.message;
       if(msg.type==='pong'){this.rtt=Math.round(performance.now()-msg.sent);return;}
@@ -45,13 +55,33 @@ export class MultiplayerClient{
   }
   send(msg){if(this.socket?.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify(msg));}
   leave(notify=true){
-    if(notify){this.send({type:'leave'});this.message='You left the room.';}++this.epoch;clearTimeout(this.timer);this.socket?.close();this.socket=null;this.room=null;this.id=null;this.token=null;this.frames=[];this.state='offline';this.onChange();
+    if(notify){this.send({type:'leave'});this.message='You left the room.';}++this.epoch;clearTimeout(this.timer);this.socket?.close();this.socket=null;this.room=null;this.id=null;this.token=null;this.frames=[];this.hostSim=null;this.hostLast=0;this.guestInput={};this.state='offline';this.onChange();
   }
   input(input,now){
     if(this.state!=='connected')return;
-    if(now-this.lastInput>=1000/30){this.send({type:'input',input});this.lastInput=now;}
+    if(this.room?.hostId!==this.id&&now-this.lastInput>=1000/30){this.send({type:'input',input});this.lastInput=now;}
     if(now-this.lastPing>2000){this.send({type:'ping',sent:now});this.lastPing=now;}
     if(now-this.lastMessage>10000)this.socket?.close();
+  }
+  advanceHost(now,input){
+    const s=this.hostSim;if(!s||this.room?.hostId!==this.id||this.state!=='connected')return;
+    const playing=this.room.status==='playing';
+    if(playing&&!s.started)s.start();
+    s.running=playing&&s.phase.id!=='finished';
+    if(playing&&this.hostLast){
+      this.hostAccumulator+=Math.min(.1,Math.max(0,(now-this.hostLast)/1000));
+      const guest=now-this.guestInputAt<300?this.guestInput:{};
+      while(this.hostAccumulator>=1/120){s.step(1/120,[input,guest]);this.hostAccumulator-=1/120;}
+    }
+    this.hostLast=playing?now:0;
+    if(now-this.lastSnapshot<50)return;
+    this.lastSnapshot=now;
+    const round=n=>Math.round(n*1000)/1000;
+    const balls=s.balls.map(b=>{if(!this.ballIds.has(b))this.ballIds.set(b,this.nextBallId++);return [this.ballIds.get(b),round(b.x),round(b.y),round(b.z)];});
+    const snapshot={type:'snapshot',status:this.room.status,countdown:this.room.countdown||0,time:s.time,started:s.started,running:s.running,
+      scores:{...s.scores},autoScores:{...s.autoScores},autoWinner:s.autoWinner,tieChoice:s.tieChoice,fired:s.fired,passed:s.passed,resolved:s.resolved,made:s.made,recycled:s.recycled,initialCenterCount:s.initialCenterCount,
+      fleet:s.fleet.map(e=>({config:e.config,robot:{...e.robot},inventory:e.inventory,turretAngle:e.state.turretAngle,intake:e.state.intake})),balls};
+    this.send(snapshot);this.frames.push({at:now,data:snapshot});if(this.frames.length>6)this.frames.shift();
   }
   apply(sim,now,input={}){
     if(!this.frames.length)return;

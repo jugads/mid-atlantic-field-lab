@@ -1,4 +1,4 @@
-import {MultiplayerClient} from './multiplayer.js?v=lagfix2';
+import {MultiplayerClient} from './multiplayer.js?v=host1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -43,7 +43,7 @@ window.addEventListener('keydown',e=>{
  e.preventDefault();if(!e.repeat&&e.code==='KeyP')togglePause();else if(!e.repeat&&e.code==='KeyR'&&(sim.started||countdown.active))reset();else keys.add(e.code);
 });
 window.addEventListener('keyup',e=>keys.delete(e.code));window.addEventListener('blur',()=>keys.clear());
-document.addEventListener('visibilitychange',()=>{keys.clear();last=0;if(!online.active&&document.hidden&&(sim.running||countdown.running))togglePause();});
+document.addEventListener('visibilitychange',()=>{keys.clear();last=0;if(document.hidden&&online.active&&online.room.hostId===online.id&&online.room.status==='playing')online.send({type:'pause'});else if(!online.active&&document.hidden&&(sim.running||countdown.running))togglePause();});
 canvas.addEventListener('pointerdown',()=>canvas.focus());
 for(const button of document.querySelectorAll('[data-hold]')){
  button.onpointerdown=e=>{e.preventDefault();button.setPointerCapture(e.pointerId);keys.add(button.dataset.hold);};
@@ -109,7 +109,7 @@ function frame(now){
  const input=blocked?{}:{up,down,left,right,...view.movement(x,y),forward:clamp(Number(up)-Number(down)-gamepad.y,-1,1),tankTurn:gamepad.x,
    turnAxis:gamepad.turn,clockwise:keys.has('KeyE')||keys.has('ArrowRight'),counterclockwise:keys.has('KeyQ')||keys.has('ArrowLeft'),shoot:keys.has('Space')||(gamepad.shoot&&!suppressGamepadShoot),intake:keys.has('ShiftLeft')||gamepad.intake};
  if(online.active){
-   online.input(input,now);online.apply(sim,now,input);refreshIdentity();
+   online.input(input,now);online.advanceHost(now,input);online.apply(sim,now,input);refreshIdentity();
    $('connectionBadge').textContent=online.state==='connected'?`${online.room.mode==='coop'?'CO-OP':'1v1'} · ${online.rtt} ms`: 'RECONNECTING';
  }else{
    sim.intake=sim.controlsEnabled&&!!input.intake;
