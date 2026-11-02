@@ -10,7 +10,7 @@ class Rooms{
   constructor({now=()=>Date.now(),maxRooms=4}={}){this.rooms=new Map();this.now=now;this.maxRooms=maxRooms;}
   send(socket,data){if(socket?.readyState===1&&socket.bufferedAmount<512000)socket.send(JSON.stringify(data));}
   fail(socket,message){this.send(socket,{type:'error',message});}
-  lobby(room){return {type:'room',protocol:2,code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,hostId:room.hostId,
+  lobby(room){return {type:'room',protocol:2,code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,hostId:room.hostId,stalled:!!room.stalled,
     players:room.players.map((p,index)=>({index,id:p.id,team:p.team,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
   broadcast(room,message=this.lobby(room)){for(const p of room.players)this.send(p.socket,message);}
   welcome(room,p){this.send(p.socket,{type:'welcome',protocol:2,id:p.id,token:p.token,code:room.code});this.broadcast(room);if(room.snapshot&&p.id!==room.hostId)this.send(p.socket,room.snapshot);}
@@ -53,7 +53,7 @@ class Rooms{
       if(p.id!==room.hostId||!['playing','paused','countdown'].includes(room.status))return;
       if(!Number.isFinite(msg.time)||msg.time<0||msg.time>166||!Array.isArray(msg.balls)||msg.balls.length>504||!Array.isArray(msg.fleet)||msg.fleet.length!==2||!msg.scores)return;
       if(room.snapshot&&msg.time+0.001<room.snapshot.time)return;
-      msg.status=room.status;room.snapshot=msg;
+      msg.status=room.status;room.snapshot=msg;room.snapshotAt=this.now();
       for(const other of room.players)if(other.id!==room.hostId)this.send(other.socket,msg);
       if(msg.time>=166&&room.status==='playing'){room.status='finished';this.broadcast(room);}
       return;
@@ -67,14 +67,15 @@ class Rooms{
       if(room.status!=='lobby')return;
       p.ready=msg.ready===true;
       if(room.players.length===2&&room.players.every(p=>p.ready&&p.socket)){
-        room.snapshot=null;room.status='countdown';room.countdown=3;room.countdownAt=this.now();
+        room.snapshot=null;room.snapshotAt=0;room.stalled=false;room.status='countdown';room.countdown=3;room.countdownAt=this.now();
       }
       this.broadcast(room);return;
     }
     if(msg.type==='pause'){
       if(!['playing','paused'].includes(room.status))return;
       if(room.players.some(p=>!p.socket))return this.fail(socket,'Waiting for the other player to reconnect.');
-      room.status=room.status==='playing'?'paused':'playing';this.broadcast(room);return;
+      if(room.status==='paused'&&room.stalled&&(!room.snapshotAt||this.now()-room.snapshotAt>2500))return this.fail(socket,'Waiting for the host to resume sending match updates.');
+      room.status=room.status==='playing'?'paused':'playing';room.stalled=false;room.playingAt=this.now();this.broadcast(room);return;
     }
     if(msg.type==='rematch'){
       if(room.status!=='finished')return this.fail(socket,'Finish the match before returning to the lobby.');
@@ -103,8 +104,12 @@ class Rooms{
       if(room.status==='countdown'){
         const before=Math.ceil(room.countdown);
         room.countdown=Math.max(0,3-(this.now()-room.countdownAt)/1000);
-        if(room.countdown<=0){room.status='playing';this.broadcast(room);}
+        if(room.countdown<=0){room.status='playing';room.playingAt=this.now();room.stalled=false;this.broadcast(room);}
         else if(Math.ceil(room.countdown)!==before)this.broadcast(room);
+      }
+      if(room.status==='playing'&&this.now()-Math.max(room.playingAt||0,room.snapshotAt||0)>2500){
+        room.status='paused';room.stalled=true;
+        this.broadcast(room,{type:'notice',message:'Host updates stopped. Match paused until the host reconnects or returns to the game.'});this.broadcast(room);
       }
     }
   }
