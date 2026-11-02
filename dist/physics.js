@@ -389,11 +389,16 @@
             this.inventory++;this.intakeClock+=1/c.intakeRate;return true;}
           // Resolve in the moving contact frame; add its velocity back exactly once.
           const pointVx=r.vx-r.omega*dy,pointVy=r.vy+r.omega*dx;
-          const rvx=b.vx-pointVx,rvy=b.vy-pointVy;
+          const incomingSpeed=Math.hypot(b.vx,b.vy),rvx=b.vx-pointVx,rvy=b.vy-pointVy;
           const local={...b,x:forward,y:side,vx:rvx*ca+rvy*sa,vy:-rvx*sa+rvy*ca};
           const beforeX=local.x,beforeY=local.y,beforeZ=local.z;this.collideBallBox(local,{x:0,y:0,width:c.length,depth:c.width,height:r.z+c.height},0);
           if(local.x!==beforeX||local.y!==beforeY||local.z!==beforeZ){b.z=local.z;b.vz=local.vz;b.x=r.x+local.x*ca-local.y*sa;b.y=r.y+local.x*sa+local.y*ca;
-            b.vx=local.vx*ca-local.vy*sa+pointVx;b.vy=local.vx*sa+local.vy*ca+pointVy;}
+            b.vx=local.vx*ca-local.vy*sa+pointVx;b.vy=local.vx*sa+local.vy*ca+pointVy;
+            // A light ball rolls and slips against the carpet instead of instantly matching
+            // the robot's full chassis speed. Preserve faster incoming/projectile motion.
+            if(b.z<=terrainHeight(b.x,b.y)+BR+.04){const speed=Math.hypot(b.vx,b.vy),limit=Math.max(1.2,incomingSpeed);
+              if(speed>limit){b.vx*=limit/speed;b.vy*=limit/speed;}}
+          }
         }
       return false;
     }
