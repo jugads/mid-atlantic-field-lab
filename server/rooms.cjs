@@ -13,7 +13,7 @@ class Rooms{
   send(socket,data){if(socket?.readyState===1&&socket.bufferedAmount<512000)socket.send(JSON.stringify(data));}
   fail(socket,message){this.send(socket,{type:'error',message});}
   lobby(room){return {type:'room',code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,
-    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,netEnabled:p.netEnabled,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
+    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
   broadcast(room,message=this.lobby(room)){for(const p of room.players)this.send(p.socket,message);}
   welcome(room,p){this.send(p.socket,{type:'welcome',id:p.id,token:p.token,code:room.code});this.broadcast(room);if(room.sim)this.send(p.socket,this.snapshot(room));}
   handle(socket,msg){
@@ -40,7 +40,7 @@ class Rooms{
         if(room.players.length>=2)return this.fail(socket,'This room already has two players.');
         if(room.status!=='lobby')return this.fail(socket,'This match has already started.');
       }
-      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team:typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341',netEnabled:true,ready:false,socket,input:{},inputAt:0};
+      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team:typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341',ready:false,socket,input:{},inputAt:0};
       room.players.push(p);socket.room=room;socket.player=p;this.welcome(room,p);return;
     }
     const room=socket.room,p=socket.player;if(!room||!p)return this.fail(socket,'Join a room first.');
@@ -50,7 +50,7 @@ class Rooms{
     if(msg.type==='select'){
       if(room.status!=='lobby')return this.fail(socket,'Robot selection is locked during a match.');
       if(!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Unknown robot.');
-      p.team=msg.team;p.netEnabled=true;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
+      p.team=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='ready'){
       if(room.status!=='lobby')return;
