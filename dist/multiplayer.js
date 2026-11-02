@@ -1,0 +1,78 @@
+/* Two-player client. Inputs go to the server; snapshots are the only world authority. */
+export class MultiplayerClient{
+  constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;}
+  get active(){return !!this.room;}
+  get self(){return this.room?.players.find(p=>p.id===this.id);}
+  normalizeEndpoint(value){
+    const url=new URL(value);if(url.username||url.password)throw Error('Use a server URL without a username or password.');
+    if(!['https:','wss:'].includes(url.protocol)&&!(['http:','ws:'].includes(url.protocol)&&['localhost','127.0.0.1'].includes(url.hostname)))throw Error('Use an HTTPS Render server URL.');
+    url.protocol=['https:','wss:'].includes(url.protocol)?'wss:':'ws:';url.pathname='/ws';url.search='';url.hash='';return url.href;
+  }
+  connect(endpoint,request){
+    try{this.endpoint=this.normalizeEndpoint(endpoint);}catch(e){this.message=e.message;this.onChange();return;}
+    this.leave(false);this.intent=request;this.state='connecting';this.message='Connecting… A sleeping Render server may take a minute to wake.';this.connectAt=performance.now();this.open(false);this.onChange();
+  }
+  open(resume){
+    const generation=++this.epoch;this.socket=new WebSocket(this.endpoint);const socket=this.socket;
+    this.lastMessage=performance.now();
+    const timeout=setTimeout(()=>{if(socket.readyState!==WebSocket.OPEN)socket.close();},60000);
+    socket.onopen=()=>{if(generation!==this.epoch)return;clearTimeout(timeout);this.lastMessage=performance.now();this.send(resume?{type:'resume',code:this.room.code,token:this.token}:this.intent);};
+    socket.onmessage=e=>{
+      if(generation!==this.epoch)return;this.lastMessage=performance.now();let msg;try{msg=JSON.parse(e.data);}catch{return;}
+      if(msg.type==='welcome'){this.id=msg.id;this.token=msg.token;this.state='connected';this.message='';this.retry=0;}
+      if(msg.type==='room'){const prior=this.room;this.room=msg;if(prior?.status!==msg.status&&msg.status==='lobby')this.frames=[];}
+      if(msg.type==='snapshot'){if(this.frames.length&&msg.time<this.frames.at(-1).data.time)this.frames=[];this.frames.push({at:performance.now(),data:msg});if(this.frames.length>6)this.frames.shift();}
+      if(msg.type==='notice')this.message=msg.message;
+      if(msg.type==='pong'){this.rtt=Math.round(performance.now()-msg.sent);return;}
+      if(msg.type==='error'){
+        this.message=msg.message;
+        if(this.state==='reconnecting'||!this.room){const message=this.message;this.leave(false);this.message=message;}
+      }
+      if(msg.type==='left'){this.leave(false);this.message='You left the room.';}
+      this.onChange(msg);
+    };
+    socket.onerror=()=>{};
+    socket.onclose=()=>{
+      clearTimeout(timeout);if(generation!==this.epoch)return;
+      if(this.room){
+        if(this.state!=='reconnecting'){this.reconnectAt=performance.now();this.frames=[];}
+        this.state='reconnecting';this.message='Connection lost. Reconnecting to your reserved seat…';
+        if(performance.now()-this.reconnectAt<28000)this.timer=setTimeout(()=>this.open(true),Math.min(4000,500*2**this.retry++));
+        else {this.leave(false);this.message='Connection could not be restored. Rejoin with the room code.';}
+      }else{this.state='offline';this.message='Could not connect. Check the server URL or retry once Render is awake.';}
+      this.onChange();
+    };
+  }
+  send(msg){if(this.socket?.readyState===WebSocket.OPEN)this.socket.send(JSON.stringify(msg));}
+  leave(notify=true){
+    if(notify){this.send({type:'leave'});this.message='You left the room.';}++this.epoch;clearTimeout(this.timer);this.socket?.close();this.socket=null;this.room=null;this.id=null;this.token=null;this.frames=[];this.state='offline';this.onChange();
+  }
+  input(input,now){
+    if(this.state!=='connected')return;
+    if(now-this.lastInput>=1000/30){this.send({type:'input',input});this.lastInput=now;}
+    if(now-this.lastPing>2000){this.send({type:'ping',sent:now});this.lastPing=now;}
+    if(now-this.lastMessage>10000)this.socket?.close();
+  }
+  apply(sim,now){
+    if(!this.frames.length)return;
+    const renderAt=now-50;
+    let a=this.frames[0],b=this.frames.at(-1);
+    for(let i=1;i<this.frames.length;i++)if(this.frames[i].at>=renderAt){a=this.frames[i-1];b=this.frames[i];break;}
+    const f=a===b?1:Math.max(0,Math.min(1,(renderAt-a.at)/(b.at-a.at))),data=b.data;
+    const lerp=(x,y)=>x+(y-x)*f;
+    const angle=(x,y)=>x+Math.atan2(Math.sin(y-x),Math.cos(y-x))*f;
+    for(const k of ['started','running','scores','autoScores','autoWinner','tieChoice','fired','passed','resolved','made','recycled','initialCenterCount'])sim[k]=data[k];
+    sim.time=lerp(a.data.time,data.time);
+    sim.fleet=data.fleet.map((e,i)=>{
+      const old=a.data.fleet[i]||e,robot={...e.robot};
+      for(const k of ['x','y','z','vx','vy','pitch','roll'])robot[k]=lerp(old.robot[k],e.robot[k]);robot.a=angle(old.robot.a,e.robot.a);
+      return {...e,robot,turretAngle:angle(old.turretAngle,e.turretAngle)};
+    });
+    sim.activeIndex=Math.max(0,this.room?.players.findIndex(p=>p.id===this.id)??0);
+    const me=sim.fleet[sim.activeIndex];if(!me)return;
+    sim.config=me.config;sim.robot=me.robot;sim.inventory=me.inventory;sim.turretAngle=me.turretAngle;sim.intake=me.intake;sim.score=data.scores[me.config.alliance];
+    const previous=new Map(a.data.balls.map(ball=>[ball[0],ball]));
+    sim.balls=data.balls.map(ball=>{const old=previous.get(ball[0])||ball;return {x:lerp(old[1],ball[1]),y:lerp(old[2],ball[2]),z:lerp(old[3],ball[3])};});
+    sim.flashes=[];
+  }
+}
