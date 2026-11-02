@@ -348,12 +348,19 @@
     }
     collideFuel(){
       // Spatial hash keeps dense starting piles and recycled fuel from passing through one another.
-      const cell=BR*2,buckets=new Map(),hash=(ix,iy,iz)=>((ix+512)*1024+iy+512)*1024+iz+512;
-      for(let i=0;i<this.balls.length;i++){const b=this.balls[i],ix=Math.floor(b.x/cell),iy=Math.floor(b.y/cell),iz=Math.floor(b.z/cell);
+      const cell=BR*2,buckets=new Map(),awake=this.balls.map(b=>!b.sleeping),hash=(ix,iy,iz)=>((ix+512)*1024+iy+512)*1024+iz+512;
+      for(let i=0;i<this.balls.length;i++){const b=this.balls[i],key=hash(Math.floor(b.x/cell),Math.floor(b.y/cell),Math.floor(b.z/cell));
+        if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(i);
+      }
+      for(let i=0;i<this.balls.length;i++){const b=this.balls[i];if(!awake[i])continue;
+        const ix=Math.floor(b.x/cell),iy=Math.floor(b.y/cell),iz=Math.floor(b.z/cell);
         for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
           const bucket=buckets.get(hash(ix+dx,iy+dy,iz+dz));if(!bucket)continue;
-          for(const j of bucket){const o=this.balls[j],xx=b.x-o.x,yy=b.y-o.y,zz=b.z-o.z,d=Math.hypot(xx,yy,zz);
-            if(d>=cell||b.sleeping&&o.sleeping)continue;
+          for(const j of bucket){const o=this.balls[j];if(i===j||(awake[j]&&j>=i))continue;
+            const xx=b.x-o.x,yy=b.y-o.y,zz=b.z-o.z,d=Math.hypot(xx,yy,zz);
+            if(d>=cell)continue;
+            // Do not wake an entire packed pile for tiny settling movements.
+            if(o.sleeping&&cell-d<.002&&Math.hypot(b.vx,b.vy,b.vz)<.12)continue;
             if(b.sleeping)b.sleeping=false;if(o.sleeping)o.sleeping=false;
             const nx=d?xx/d:1,ny=d?yy/d:0,nz=d?zz/d:0,overlap=(cell-d)*.5;
             b.x+=nx*overlap;b.y+=ny*overlap;b.z+=nz*overlap;o.x-=nx*overlap;o.y-=ny*overlap;o.z-=nz*overlap;
@@ -362,7 +369,6 @@
               const impulse=-relative*(grounded?.51:.65);b.vx+=nx*impulse;b.vy+=ny*impulse;b.vz+=nz*impulse;o.vx-=nx*impulse;o.vy-=ny*impulse;o.vz-=nz*impulse;}
           }
         }
-        const key=hash(ix,iy,iz);if(!buckets.has(key))buckets.set(key,[]);buckets.get(key).push(i);
       }
     }
     step(dt,input={}){
@@ -476,7 +482,10 @@
         let collected=false;
         if(this.multiplayer){
           for(let n=0;n<this.fleet.length;n++){
-            this.loadDriver((n+this.driverOrder)%this.fleet.length);
+            const index=(n+this.driverOrder)%this.fleet.length,entry=this.fleet[index];
+            const reach=Math.hypot(entry.config.length,entry.config.width)/2+.35;
+            if(Math.abs(b.x-entry.robot.x)>reach||Math.abs(b.y-entry.robot.y)>reach)continue;
+            this.loadDriver(index);
             collected=this.contactRobotFuel(b);this.saveDriver();if(collected)break;
           }
           this.loadDriver(0);
@@ -493,7 +502,11 @@
       }
       this.balls=kept;this.collideFuel();
       // Contact correction may move a resting ball slightly below carpet or outside a wall.
-      for(const b of this.balls){if(b.sleeping)continue;b.x=clamp(b.x,BR,W-BR);b.y=clamp(b.y,BR,H-BR);b.z=Math.max(BR+terrainHeight(b.x,b.y),b.z);}
+      for(const b of this.balls){if(b.sleeping)continue;b.x=clamp(b.x,BR,W-BR);b.y=clamp(b.y,BR,H-BR);b.z=Math.max(BR+terrainHeight(b.x,b.y),b.z);
+        if(!b.shot&&!b.hubInside&&b.z<=BR+terrainHeight(b.x,b.y)+.002&&Math.hypot(b.vx,b.vy,b.vz)<.12){
+          b.restTime=(b.restTime||0)+dt;if(b.restTime>.5){b.sleeping=true;b.vx=b.vy=b.vz=0;b.restTime=0;}
+        }else b.restTime=0;
+      }
       for(const f of this.flashes)f.life-=dt;this.flashes=this.flashes.filter(f=>f.life>0);
       if(this.time>=166-1e-8){this.time=166;this.running=false;for(const entry of this.fleet){entry.robot.vx=0;entry.robot.vy=0;}}
     }
