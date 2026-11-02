@@ -342,6 +342,13 @@ test('robot contact uses relative velocity without repeated energy injection',()
  const s=empty({maxSpeed:4});s.start();s.time=25;s.intake=false;s.robot.x=7;s.robot.y=1;s.robot.vx=4;
  s.balls=[{...ball(s.robot.x+s.config.length/2+BR-.005,1),vx:4}];advance(s,.3,{right:true});assert(Math.hypot(s.balls[0].vx,s.balls[0].vy)<6);
 });
+test('a robot at full speed nudges resting fuel rather than launching it',()=>{
+ const s=empty();s.start();s.intake=false;Object.assign(s.robot,{x:7,y:1,a:0,vx:5,vy:0});
+ s.balls=[ball(7+s.config.length/2+BR-.01,1)];s.contactRobotFuel(s.balls[0]);
+ assert(Math.hypot(s.balls[0].vx,s.balls[0].vy)<=1.21);
+ const fast=ball(7+s.config.length/2+BR-.01,1);fast.vx=-10;s.contactRobotFuel(fast);
+ assert(Math.hypot(fast.vx,fast.vy)>1.2,'fast incoming fuel is not reduced to pushing speed');
+});
 test('fuel compressed against a wall does not gain excessive speed',()=>{
  const s=empty({intakeRate:1});s.start();s.time=25;s.intake=false;
  Object.assign(s.robot,{x:1.7,y:1.2,a:Math.PI,vx:-5,vy:0});
