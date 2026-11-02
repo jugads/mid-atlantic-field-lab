@@ -101,10 +101,14 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
 });
 test('5895 has two corner turrets, 40 total capacity and fits the trench',()=>{
  const c=resolvePreset('5895');assert.equal(c.archetype,'double_turret');assert.equal(c.capacity,40);assert.equal(c.baseCapacity,30);assert.equal(c.moving,80);assert(canUseTrench(c));
- assert.equal(c.feedRate,6);assert.equal(c.intakeRate,5);const s=empty({...c,autoAim:true,stationary:100,moving:100});
+ assert.equal(c.feedRate,14);assert.equal(c.intakeRate,32);const s=empty({...c,autoAim:true,stationary:100,moving:100});
  s.turretAngle=s.aimAngle;s.inventory=2;assert.equal(s.fire(1),1);assert.equal(s.fire(1),1);
  const [a,b]=s.balls;assert(Math.hypot(a.x-b.x,a.y-b.y)>.4,'shots originate at separate corners');
  assert.equal(s.nextTurret,0);assert.equal(s.fired,2);
+});
+test('5895 fills comfortably driving full speed through center fuel',()=>{
+ const s=new Simulation(resolvePreset('5895'),()=>.5);Object.assign(s.robot,{x:W/2-2,y:H/2+1,a:0,vx:5,vy:0});s.start();s.intake=true;
+ advance(s,1,{moveX:1});assert(s.inventory>=35,'should nearly fill while crossing the center pile');assert.equal(total(s),504);
 });
 test('316 disables intake only while shooting with fuel and moving',()=>{
  const c=resolvePreset('316'),s=empty(c);s.start();s.inventory=10;
