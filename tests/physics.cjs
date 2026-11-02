@@ -92,10 +92,10 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
  assert.equal(Object.keys(profiles).length,7);
  assert.equal(p341.baseCapacity,8);assert.equal(p341.capacity,18);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
- assert.equal(p316.baseCapacity,50);assert.equal(p316.capacity,60);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,37);assert.equal(p316.moving,75);
+ assert.equal(p316.baseCapacity,50);assert.equal(p316.capacity,60);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
  assert.equal(p1391.baseCapacity,45);assert.equal(p1391.capacity,55);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
- assert.equal(p8513.baseCapacity,80);assert.equal(p8513.capacity,90);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,35);assert.equal(p8513.moving,0);
- const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','intakeRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
+ assert.equal(p8513.baseCapacity,80);assert.equal(p8513.capacity,90);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
+ const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.intakeRate,35);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
  const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.baseCapacity,35);assert.equal(p9094.capacity,45);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
 });
