@@ -89,15 +89,29 @@ test('releasing drive controls applies strong braking without changing accelerat
 });
 test('user-supplied team builds resolve with the requested specifications',()=>{
  const p341=resolvePreset('341'),p316=resolvePreset('316'),p1391=resolvePreset('1391'),p8513=resolvePreset('8513');
- assert.equal(Object.keys(profiles).length,6);
+ assert.equal(Object.keys(profiles).length,7);
  assert.equal(p341.baseCapacity,8);assert.equal(p341.capacity,18);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
- assert.equal(p316.baseCapacity,50);assert.equal(p316.capacity,60);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,23);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,37);assert.equal(p316.moving,75);
+ assert.equal(p316.baseCapacity,50);assert.equal(p316.capacity,60);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,37);assert.equal(p316.moving,75);
  assert.equal(p1391.baseCapacity,45);assert.equal(p1391.capacity,55);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
  assert.equal(p8513.baseCapacity,80);assert.equal(p8513.capacity,90);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,35);assert.equal(p8513.moving,0);
  const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','intakeRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
- const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.baseCapacity,35);assert.equal(p9094.capacity,45);assert.equal(p9094.feedRate,10);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
+ const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.baseCapacity,35);assert.equal(p9094.capacity,45);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
+});
+test('5895 has two corner turrets, 40 total capacity and fits the trench',()=>{
+ const c=resolvePreset('5895');assert.equal(c.archetype,'double_turret');assert.equal(c.capacity,40);assert.equal(c.baseCapacity,30);assert.equal(c.moving,80);assert(canUseTrench(c));
+ assert.equal(c.feedRate,6);assert.equal(c.intakeRate,5);const s=empty({...c,autoAim:true,stationary:100,moving:100});
+ s.turretAngle=s.aimAngle;s.inventory=2;assert.equal(s.fire(1),1);assert.equal(s.fire(1),1);
+ const [a,b]=s.balls;assert(Math.hypot(a.x-b.x,a.y-b.y)>.4,'shots originate at separate corners');
+ assert.equal(s.nextTurret,0);assert.equal(s.fired,2);
+});
+test('316 disables intake only while shooting with fuel and moving',()=>{
+ const c=resolvePreset('316'),s=empty(c);s.start();s.inventory=10;
+ s.intake=true;advance(s,.1,{moveY:1,shoot:true});assert(!s.intake);
+ s.robot.vx=0;s.robot.vy=0;s.intake=true;advance(s,.01,{shoot:true});assert(s.intake,'stationary shooting can intake');
+ s.intake=true;advance(s,.1,{moveY:1});assert(s.intake,'driving without shooting can intake');
+ const other=empty(resolvePreset('1391'));other.start();other.intake=true;advance(other,.1,{moveY:1,shoot:true});assert(other.intake);
 });
 test('0% SOTM profiles miss while moving but still shoot normally when stationary',()=>{
  for(const team of ['1391','8513']){
