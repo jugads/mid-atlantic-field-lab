@@ -43,6 +43,16 @@ test('robot contacts prevent passing through one another',()=>{
  const s=fleet('coop');s.balls=[];Object.assign(s.fleet[0].robot,{x:7,y:4,a:0});Object.assign(s.fleet[1].robot,{x:9,y:4,a:0});s.start();advance(s,1,[{moveX:1},{moveX:-1}]);
  const [a,b]=s.fleet;assert(a.robot.x<b.robot.x);const hit=rectangleContact(a.robot,a.config.length,a.config.width,{x:b.robot.x,y:b.robot.y,width:b.config.length,depth:b.config.width,a:b.robot.a});assert(!hit||hit.depth<.001);
 });
+test('robot impacts transfer momentum to a stationary defender',()=>{
+ const s=fleet('coop');s.balls=[];const [a,b]=s.fleet;Object.assign(a.robot,{x:7,y:4,a:0,vx:4,vy:0});Object.assign(b.robot,{x:7.8,y:4,a:0,vx:0,vy:0});
+ s.loadDriver(0);const ma=54+a.inventory*.2268,mb=54+b.inventory*.2268,before=ma*a.robot.vx+mb*b.robot.vx;s.resolveRobot();
+ assert(b.robot.vx>1,'defender receives forward momentum');assert(a.robot.vx<4,'attacker loses momentum');
+ assert(Math.abs(ma*a.robot.vx+mb*b.robot.vx-before)<1e-8,'contact conserves linear momentum');
+});
+test('bumper friction resists sliding along a defender',()=>{
+ const s=fleet('coop');s.balls=[];const [a,b]=s.fleet;Object.assign(a.robot,{x:7,y:4,a:0,vx:3,vy:2});Object.assign(b.robot,{x:7.8,y:4,a:0,vx:0,vy:0});
+ s.loadDriver(0);s.resolveRobot();assert(a.robot.vy<2,'attacker loses sideways speed');assert(b.robot.vy>0,'defender receives sideways momentum');
+});
 test('both shooters maintain separate feed and PID state; fuel remains conserved',()=>{
  const s=fleet();s.start();advance(s,3,[{shoot:true},{shoot:true}]);assert(s.fleet.every(e=>e.inventory<8));assert.notEqual(s.fleet[0].state.aimController,s.fleet[1].state.aimController);assert.equal(total(s),504);assert(s.fired>8);
 });
