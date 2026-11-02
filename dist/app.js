@@ -1,5 +1,5 @@
-import {MultiplayerClient} from './multiplayer.js?v=fuel1';
-import {FieldView} from './view3d.js?v=fuel1';
+import {MultiplayerClient} from './multiplayer.js?v=fuel2';
+import {FieldView} from './view3d.js?v=fuel2';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
