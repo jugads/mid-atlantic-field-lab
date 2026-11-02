@@ -1,6 +1,6 @@
 # Two-player private rooms
 
-Implemented: six-character private room codes, two seats, 1v1 (blue/red) and co-op (both blue), preset robots with standard collapsible rectangular nets, ready votes, shared three-second countdown and match phases, shared fuel/score, per-driver controls, shared pause, return-to-lobby after a match, explicit leave, and a 30-second disconnect reservation with automatic connection retry. AUTO remains driver-controlled.
+Implemented: six-character private room codes, two seats, 1v1 (blue/red) and co-op (both blue), preset robots, ready votes, shared three-second countdown and match phases, shared fuel/score, per-driver controls, shared pause, return-to-lobby after a match, explicit leave, and a 30-second disconnect reservation with automatic connection retry. AUTO remains driver-controlled.
 
 ## Run locally
 
@@ -48,4 +48,3 @@ References: https://render.com/docs/websocket and https://render.com/docs/bluepr
 
 The local tests exercise real WebSockets and two Chrome clients. Internet latency, Render cold starts, and sustained multi-room load cannot be validated until the server is hosted. Recheck disconnect recovery and play a full match from two devices once the Render URL exists.
 
-All presets now include 10 extra net capacity. Nets collapse at or below base hopper capacity; only overflow blocks an otherwise short robot from the trench. Intake cannot expand the net while underneath the trench roof.
