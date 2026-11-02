@@ -157,45 +157,17 @@ export class FieldView {
       this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
       this.box(.20,.07,.10,.15,.07,0,'#aaa2b1',shooter);
     }
-    let net=null;
-    if(c.netEnabled){
-      const geometry=new T.BoxGeometry(1,1,1,8,3,8);
-      net=new T.Group();net.position.y=h;group.add(net);
-      const mesh=new T.Mesh(geometry,new T.MeshBasicMaterial({color:'#dbc5ff',wireframe:true,transparent:true,opacity:.65}));net.add(mesh);
-      const contents=new T.Group();net.add(contents);
-      for(let i=0;i<10;i++){
-        const fuel=new T.Mesh(new T.SphereGeometry(BR,10,8),new T.MeshStandardMaterial({color:'#f1d455',roughness:.8}));
-        fuel.position.set((i%5-2)*.15,.075,(Math.floor(i/5)-.5)*.17);contents.add(fuel);
-      }
-      net.userData={mesh,contents,rest:geometry.attributes.position.array.slice(),amount:0,lastTime:performance.now()};
-    }
-    return {body,fill,intakeBar,shooter,turrets,net};
+    return {body,fill,intakeBar,shooter,turrets};
   }
   updateFill(visual,config,inventory){
-    const fraction=Math.max(0,Math.min(1,inventory/(config.baseCapacity||config.capacity)));
+    const fraction=Math.max(0,Math.min(1,inventory/config.capacity));
     const height=Math.max(.005,(config.height-.24)*fraction);
     visual.fill.visible=inventory>0;visual.fill.scale.y=height;visual.fill.position.y=.23+height/2;
-    if(visual.net){
-      const data=visual.net.userData,now=performance.now(),dt=Math.min(.1,(now-data.lastTime)/1000);data.lastTime=now;
-      const extra=Math.max(0,inventory-(config.baseCapacity||config.capacity-10));
-      data.amount+=(extra/10-data.amount)*(1-Math.exp(-8*dt));
-      // Rectangular footprint and flat top; side panels bow gently with the load.
-      const rise=Math.max(.006,(.16+.14*data.amount)*Math.min(1,data.amount*10));
-      data.mesh.scale.set(config.length*.88,rise,config.width*.88);data.mesh.position.y=rise/2;
-      const vertices=data.mesh.geometry.attributes.position;
-      for(let i=0;i<vertices.count;i++){
-        const x=data.rest[i*3],y=data.rest[i*3+1],z=data.rest[i*3+2];
-        const bow=1+.08*data.amount*Math.sin((y+.5)*Math.PI);
-        vertices.setXYZ(i,x*bow,y,z*bow);
-      }
-      vertices.needsUpdate=true;
-      data.contents.children.forEach((fuel,i)=>{fuel.visible=i<extra;fuel.scale.setScalar(Math.min(1,Math.max(.01,data.amount*10-i)));});
-    }
     visual.body.material.color.lerpColors(new T.Color('#303631'),new T.Color('#f1d455'),fraction);
   }
   rebuildRobot(c){
     this.disposeGroup(this.chassis);this.activeVisual=this.genericRobot(this.chassis,c);this.intakeBar=this.activeVisual.intakeBar;
-    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection,c.netEnabled].join('|');
+    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
   }
   setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;}
   resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
@@ -206,7 +178,7 @@ export class FieldView {
     return {moveX:right.x*x-forward.x*y,moveY:right.z*x-forward.z*y};
   }
   draw(sim,grid){
-    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection,c.netEnabled].join('|');
+    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
     this.chassis.rotation.set(-r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
@@ -216,7 +188,7 @@ export class FieldView {
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
       if(index===sim.activeIndex)return;parkedKeys.add(index);
-      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection,pc.shooterMount,pc.intakeDirection,pc.netEnabled].join('|');
+      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection,pc.shooterMount,pc.intakeDirection].join('|');
       let visual=this.parkedVisuals.get(index);
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
       visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(-pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);

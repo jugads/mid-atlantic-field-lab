@@ -32,9 +32,8 @@
     for(const side of [-1,1])for(let i=0;i<8;i++){const f=i/7;solids.push({x:t.x+towardWall*f*(TOWER.postX-.05),y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:.13,depth:.045,bottom:.95+f*.38-.025,height:.95+f*.38+.025,tower:true});}
   }
   // Prefer the trench only when the chassis fits the opening, leaving a little steering room.
-  const clearanceHeight=(c,inventory=0)=>c.netEnabled&&inventory>c.baseCapacity
-    ?Math.max(c.height+.16+.14*clamp((inventory-c.baseCapacity)/10,0,1),FIELD.trenchClearance+.02):c.height;
-  const canUseTrench=(c,inventory=0)=>clearanceHeight(c,inventory)<=FIELD.trenchClearance&&c.width<=FIELD.trenchWidth-.08;
+  const clearanceHeight=c=>c.height;
+  const canUseTrench=c=>clearanceHeight(c)<=FIELD.trenchClearance&&c.width<=FIELD.trenchWidth-.08;
   function startingLocations(c){
     const trench=[FIELD.trenchWidth/2,H-FIELD.trenchWidth/2];
     const bumpOffset=FIELD.hubSize/2+FIELD.bumpWidth/2;
@@ -180,11 +179,6 @@
       }
       if(this.shotSolution.outOfRange)return 'OUT OF RANGE';
       return this.inAllianceZone?'SHOOT HUB':'PASS TO HOME';
-    }
-    get intakeCapacity(){
-      // A collapsed net cannot expand through the roof while the chassis is underneath it.
-      const c=this.config;
-      return c.netEnabled&&trenches.some(t=>rectangleContact(this.robot,c.length,c.width,t))?c.baseCapacity:c.capacity;
     }
     get radius(){return Math.hypot(this.config.width,this.config.length)/2;}
     get phase(){return !this.started?{id:'ready',label:'READY',start:0,end:20}:phaseAt(this.time);}
@@ -384,7 +378,7 @@
       const c=this.config,r=this.robot;
         if(b.z<r.z+c.height&&(b.launchTime===undefined||this.time-b.launchTime>.15)){const ca=Math.cos(r.a),sa=Math.sin(r.a),dx=b.x-r.x,dy=b.y-r.y,
           forward=dx*ca+dy*sa,side=-dx*sa+dy*ca;
-          if(this.controlsEnabled&&this.intake&&this.inventory<this.intakeCapacity&&this.intakeClock<=1e-8&&
+          if(this.controlsEnabled&&this.intake&&this.inventory<c.capacity&&this.intakeClock<=1e-8&&
             b.z<r.z+.3&&forward*intakeSign(c)>c.length/2-.1&&forward*intakeSign(c)<c.length/2+.3&&Math.abs(side)<c.width/2+.04){
             this.inventory++;this.intakeClock+=1/c.intakeRate;return true;}
           // Resolve in the moving contact frame; add its velocity back exactly once.

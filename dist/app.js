@@ -1,5 +1,5 @@
-import {MultiplayerClient} from './multiplayer.js?v=fuel2';
-import {FieldView} from './view3d.js?v=fuel2';
+import {MultiplayerClient} from './multiplayer.js?v=nonet1';
+import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
@@ -13,7 +13,7 @@ function selectRobot(team){
   selectedTeam=team;sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
   const moveFocus=document.activeElement?.classList.contains('robot-choice');
   for(const button of $('robotChoices').children){const active=button.dataset.team===team;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));if(active&&moveFocus)button.focus();}
-  $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'} · Net +10 · Empty net clears trench if robot fits`;
+  $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;
   if(online.active)online.send({type:'select',team});
   refreshIdentity();updateMatch();
 }
@@ -27,7 +27,7 @@ function createChoices(){
   }
 }
 function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.team;$('robotName').textContent=names[c.team];
- $('robotType').textContent=ARCHETYPES[c.archetype].label+' · '+(c.drive==='swerve'?'Swerve':'Tank')+' · '+(c.alliance==='blue'?'Blue':'Red')+' alliance'+(c.netEnabled?' · NET +10':'');
+ $('robotType').textContent=ARCHETYPES[c.archetype].label+' · '+(c.drive==='swerve'?'Swerve':'Tank')+' · '+(c.alliance==='blue'?'Blue':'Red')+' alliance';
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
@@ -125,7 +125,7 @@ function previewLobby(){
  sim.roster=room.players.map(p=>resolvePreset(p.team,p.alliance));sim.reset();
  const me=online.self;if(me)selectedTeam=me.team;
  for(const button of $('robotChoices').children){const active=button.dataset.team===selectedTeam;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));}
- $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'} · Net +10 · Empty net clears trench if robot fits`;
+ $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;
  refreshIdentity();
 }
 function networkChanged(msg){

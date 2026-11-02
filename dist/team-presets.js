@@ -15,13 +15,13 @@
     // The 2026 robot height limit is 30 inches (0.762 m). Lane count defaults to three.
     '8513':{shooterDirection:'back',archetype:'dumper',height:.762,capacity:80,feedRate:20,intakeRate:25,moving:0},
     '193':{intakeDirection:'front',shooterMount:'back',shooterDirection:'front',archetype:'dumper',height:.762,capacity:80,feedRate:20,intakeRate:35,moving:0,maxRange:2},
-    '5895':{archetype:'double_turret',height:.50,width:.75,length:.80,capacity:30,feedRate:14,intakeRate:32,moving:80,intakeDirection:'front'},
+    '5895':{archetype:'double_turret',height:.50,width:.75,length:.80,capacity:40,feedRate:14,intakeRate:32,moving:80,intakeDirection:'front'},
     '9094':{archetype:'turret',capacity:35,feedRate:7,intakeRate:20,moving:75}
   };
   function resolve(team,alliance='blue'){
     const p=profiles[team];if(!p)return null;
     const {base,ARCHETYPES}=root.FieldPhysics;
-    return {...base,...ARCHETYPES[p.archetype].settings,...p,team,alliance,netEnabled:true,baseCapacity:p.capacity,capacity:p.capacity+10};
+    return {...base,...ARCHETYPES[p.archetype].settings,...p,team,alliance};
   }
   root.TeamPresets={names,profiles,resolve};
   if(typeof module!=='undefined')module.exports=root.TeamPresets;
