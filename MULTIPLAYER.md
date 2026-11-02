@@ -36,13 +36,13 @@ References: https://render.com/docs/websocket and https://render.com/docs/bluepr
 ## Architecture and first-version limits
 
 - Node.js + `ws`; browser-native WebSocket client. No game-server credentials or secrets in the frontend. Room codes are invite secrets; anyone with the code can claim an available seat.
-- Server owns both robot configurations, inputs, intake/feed clocks, PID controllers, collisions, all 504 fuel, scores, and match time. Clients cannot set positions, scores, or arbitrary robot specs.
-- 120 Hz world step with adaptive contact substeps; 30 Hz input messages; 20 Hz snapshots. Ball IDs stay stable for interpolation. Both clients render with a 50 ms interpolation buffer. This version does not yet predict local movement or compensate for high latency; driving can feel delayed on a distant server.
-- Inputs older than 300 ms become neutral. Hiding or unfocusing a browser releases controls without pausing the other player's match. Help releases controls. P pauses/resumes for both players. Leaving ends the match and returns the remaining player to the lobby.
+- The room creator’s browser owns the authoritative physics, clock, fuel and score. The server manages rooms, sanitizes guest input, and relays snapshots. This is intended for private matches between trusted players; a modified host can change the simulation.
+- The host runs a 120 Hz world step with adaptive contact substeps, receives guest input at up to 30 Hz, and sends snapshots at up to 20 Hz. Both clients interpolate snapshots and predict their own robot within a bounded window. The host should keep the game tab visible; hiding it pauses the match.
+- Guest inputs older than 300 ms become neutral. Hiding the host tab pauses the shared match; hiding or unfocusing a guest browser releases controls. Help releases controls. P pauses/resumes for both players. Leaving ends the match and returns the remaining player to the lobby.
 - A dropped connection pauses the match; the same open tab retries with a private seat token. The seat expires after 30 seconds. Refreshing/closing the tab loses that token; wait for the reservation to expire before joining again. A successful reconnect stays paused until a player presses Resume.
 - Rooms live in memory on one server instance. Deploys/restarts discard rooms. Keep one instance; multi-instance routing requires shared room ownership and is not implemented. A free Render service can sleep when idle and take time to wake. It is suitable for initial testing, not an availability guarantee.
 - Default maximum: four rooms and 32 connections. No room browser, accounts, public matchmaking, spectators, persistent match history, 3v3, or bots. Co-op follows the existing active/inactive schedule; both players share blue's score. Shot and accuracy telemetry is room-wide; inventory and speed are per-driver.
-- Full fuel positions are sent at 20 Hz. Before increasing room count, measure CPU and bandwidth with real players. Server backpressure skips snapshots for slow clients, and payload/rate limits reject oversized or excessive input.
+- Full fuel positions are relayed at up to 20 Hz. The host must stay connected and have enough CPU to run the field. Server backpressure skips snapshots for slow clients, and payload/rate limits reject oversized or excessive input.
 
 ## Live verification still required after Render deployment
 
