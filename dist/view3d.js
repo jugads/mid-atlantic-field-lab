@@ -139,7 +139,7 @@ export class FieldView {
     // A single small bumper number and a simple shooter block keep the robot readable.
     const tag=new T.Mesh(new T.PlaneGeometry(l*.48,.10),new T.MeshBasicMaterial({map:tex}));
     tag.position.set(0,.16,w/2+.003);group.add(tag);
-    const shooter=new T.Group();group.add(shooter);
+    const shooter=new T.Group();group.add(shooter);const turrets=[];
     const back=c.shooterDirection==='back',direction=back?-1:1;
     const mount=(c.shooterMount||c.shooterDirection)==='back'?-1:1;
     shooter.position.set(c.archetype==='dumper'?mount*l*.30:0,h+.025,0);
@@ -147,8 +147,14 @@ export class FieldView {
       // One compact housing with a dark outlet, centered across the configured lanes.
       this.box(.22,.11,w*.36,0,.055,0,'#77717e',shooter);
       this.box(.012,.052,w*.28,direction*.116,.065,0,'#29252f',shooter);
+    }else if(c.archetype==='double_turret'){
+      for(const side of [-1,1]){
+        const turret=new T.Group();turret.position.set(-l*.34,0,side*w*.34);shooter.add(turret);turrets.push(turret);
+        this.cylinder(.10,.10,.065,0,.033,0,'#77717e',turret);
+        this.box(.17,.07,.09,.13,.07,0,'#aaa2b1',turret);
+      }
     }else{
-      const base=this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
+      this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
       this.box(.20,.07,.10,.15,.07,0,'#aaa2b1',shooter);
     }
     let net=null;
@@ -163,7 +169,7 @@ export class FieldView {
       }
       net.userData={mesh,contents,rest:geometry.attributes.position.array.slice(),amount:0,lastTime:performance.now()};
     }
-    return {body,fill,intakeBar,shooter,net};
+    return {body,fill,intakeBar,shooter,turrets,net};
   }
   updateFill(visual,config,inventory){
     const fraction=Math.max(0,Math.min(1,inventory/(config.baseCapacity||config.capacity)));
@@ -206,6 +212,7 @@ export class FieldView {
     this.chassis.rotation.set(-r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
     const solution=sim.shotSolution,target=solution.target,aim=sim.shooterAngle;this.updateFill(this.activeVisual,c,sim.inventory);
     if(c.archetype==='turret')this.activeVisual.shooter.rotation.y=-(aim-r.a);
+    if(c.archetype==='double_turret')this.activeVisual.turrets.forEach((turret,i)=>{turret.rotation.y=-(sim.doubleTurretAngle(i)-r.a);});
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
       if(index===sim.activeIndex)return;parkedKeys.add(index);
@@ -214,6 +221,7 @@ export class FieldView {
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
       visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(-pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
       if(pc.archetype==='turret'&&Number.isFinite(entry.turretAngle))visual.shooter.rotation.y=-(entry.turretAngle-pr.a);
+      if(pc.archetype==='double_turret'&&Number.isFinite(entry.turretAngle))visual.turrets.forEach(turret=>{turret.rotation.y=-(entry.turretAngle-pr.a);});
       visual.intakeBar.material.color.set(entry.intake?'#c8a5ff':'#665b70');
     });
     for(const [index,visual] of this.parkedVisuals)if(!parkedKeys.has(index)){this.disposeGroup(visual.group);this.scene.remove(visual.group);this.parkedVisuals.delete(index);}

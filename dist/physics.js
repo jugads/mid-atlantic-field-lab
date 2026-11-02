@@ -7,6 +7,7 @@
     drive:'swerve', alliance:'blue', autoAim:true, team:'341', autoRoutine:'preload', archetype:'turret',lanes:1,shooterDirection:'front',aimKp:16,aimKi:.4,aimKd:.12,aimMaxRate:12};
   const ARCHETYPES = {
     turret: {label:'Turret',description:'Swiveling shooter · fire while moving',settings:{archetype:'turret',width:.85,length:.9,height:.52,capacity:30,feedRate:6,intakeRate:5,maxSpeed:5,acceleration:10,stationary:92,moving:65,lanes:1}},
+    double_turret: {label:'Double turret',description:'Two swiveling corner shooters · shared feed',settings:{archetype:'double_turret',width:.75,length:.80,height:.50,capacity:30,feedRate:6,intakeRate:5,maxSpeed:5,acceleration:10,stationary:92,moving:80,lanes:1,intakeDirection:'front'}},
     dumper: {label:'Big dumper',description:'Fixed multi-lane shooter · chassis aim · moving accuracy',settings:{archetype:'dumper',aimLockWhileShooting:true,width:1,length:1.05,height:.72,capacity:60,feedRate:12,intakeRate:9,maxSpeed:5,acceleration:10,stationary:95,moving:40,lanes:3}}
   };
   const FIELD = {hubSize:1.194, hubHeight:1.83, openingRadius:.53,
@@ -77,7 +78,7 @@
     }
     return best;
   }
-  const ROBOT_STATE=['inventory','intake','intakeClock','fireClock','feedBudget','feedThreshold','aimController','turretController','turretAngle'];
+  const ROBOT_STATE=['nextTurret','inventory','intake','intakeClock','fireClock','feedBudget','feedThreshold','aimController','turretController','turretAngle'];
   class Simulation {
     constructor(config={},random=Math.random){this.config={...base,...config};this.random=random;this.roster=[{...this.config}];this.activeIndex=0;this.reset();}
     reset(){
@@ -95,7 +96,7 @@
       const c=this.config;
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
       this.fired=0;this.passed=0;this.resolved=0;this.made=0;this.inactiveMade=0;this.recycled=0;this.time=0;
-      this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
+      this.nextTurret=0;this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
       this.aimController={integral:0,previousError:null,rate:0};this.turretController={integral:0,previousError:null,rate:0};this.turretAngle=this.robot.a;
       this.autoWinner=null;this.tieChoice=this.random()<.5?'blue':'red';this.balls=[];this.pending=[];this.flashes=[];
       this.outpostReserve={blue:24,red:24};
@@ -114,7 +115,7 @@
     }
     enableMultiplayer(configs){
       this.multiplayer=true;this.activeIndex=0;this.roster=configs.map(c=>({...base,...c}));this.reset();
-      for(const entry of this.fleet)entry.state={inventory:entry.inventory,intake:false,intakeClock:0,fireClock:0,feedBudget:0,feedThreshold:1,
+      for(const entry of this.fleet)entry.state={nextTurret:0,inventory:entry.inventory,intake:false,intakeClock:0,fireClock:0,feedBudget:0,feedThreshold:1,
         aimController:{integral:0,previousError:null,rate:0},turretController:{integral:0,previousError:null,rate:0},turretAngle:entry.robot.a};
       this.loadDriver(0);
     }
@@ -152,15 +153,24 @@
       state.previousError=error;state.rate=clamp(raw,-limit,limit);return state.rate;
     }
     resetAimPID(state){state.integral=0;state.previousError=null;state.rate=0;}
-    get shooterOrigin(){const r=this.robot,c=this.config,forward=c.archetype==='dumper'?((c.shooterMount||c.shooterDirection)==='back'?-1:1)*c.length*.30:0;
+    get shooterOrigin(){const r=this.robot,c=this.config,forward=c.archetype==='dumper'?((c.shooterMount||c.shooterDirection)==='back'?-1:1)*c.length*.30:c.archetype==='double_turret'?-c.length*.34:0;
       return {x:r.x+Math.cos(r.a)*forward,y:r.y+Math.sin(r.a)*forward};}
     get aimAngle(){const {target,flight}=this.shotSolution,r=this.robot,o=this.shooterOrigin;
       return Math.atan2(target.y-o.y-r.vy*flight,target.x-o.x-r.vx*flight);}
+    doubleTurretOrigin(index){
+      const r=this.robot,c=this.config,forward=-c.length*.34,side=(index?1:-1)*c.width*.34,ca=Math.cos(r.a),sa=Math.sin(r.a);
+      return {x:r.x+ca*forward-sa*side,y:r.y+sa*forward+ca*side};
+    }
+    doubleTurretAngle(index){
+      const o=this.doubleTurretOrigin(index),{target,flight}=this.shotSolution,r=this.robot;
+      const desired=Math.atan2(target.y-o.y-r.vy*flight,target.x-o.x-r.vx*flight);
+      return desired+Math.atan2(Math.sin(this.turretAngle-this.aimAngle),Math.cos(this.turretAngle-this.aimAngle));
+    }
     get chassisAimAngle(){return this.aimAngle-(this.config.shooterDirection==='back'?Math.PI:0);}
-    get shooterAngle(){return this.config.archetype==='turret'&&this.config.autoAim?this.turretAngle:this.robot.a+(this.config.shooterDirection==='back'?Math.PI:0);}
+    get shooterAngle(){return ['turret','double_turret'].includes(this.config.archetype)&&this.config.autoAim?this.turretAngle:this.robot.a+(this.config.shooterDirection==='back'?Math.PI:0);}
     get fireStatus(){
       if(!this.inventory)return 'EMPTY';
-      if(this.config.archetype==='turret'&&this.config.autoAim){
+      if(['turret','double_turret'].includes(this.config.archetype)&&this.config.autoAim){
         const error=Math.atan2(Math.sin(this.aimAngle-this.turretAngle),Math.cos(this.aimAngle-this.turretAngle));
         if(Math.abs(error)>.07)return 'ALIGNING TURRET';
       }
@@ -247,12 +257,14 @@
         const lane=(startLane+i)%lanes;
         const offset=laneOffset(lane,lanes,c.width);
         const forward=c.archetype==='dumper'?((c.shooterMount||c.shooterDirection)==='back'?-1:1)*c.length*.30:0;
-        const ox=r.x+Math.cos(r.a)*forward-Math.sin(r.a)*offset,oy=r.y+Math.sin(r.a)*forward+Math.cos(r.a)*offset;
+        const origin=c.archetype==='double_turret'?this.doubleTurretOrigin(this.nextTurret):{x:r.x+Math.cos(r.a)*forward-Math.sin(r.a)*offset,y:r.y+Math.sin(r.a)*forward+Math.cos(r.a)*offset};
+        const ox=origin.x,oy=origin.y;
         const ex=gaussian()*sigma*(.7+d/5),ey=gaussian()*sigma*(.7+d/5);
         let vx=(h.x-ox+ex)/t,vy=(h.y-oy+ey)/t;
-        if(!c.autoAim||c.archetype==='dumper'||c.archetype==='turret'){
+        if(!c.autoAim||['dumper','turret','double_turret'].includes(c.archetype)){
           const magnitude=Math.hypot(h.x-ox-r.vx*t,h.y-oy-r.vy*t)/t;
-          vx=Math.cos(this.shooterAngle)*magnitude+r.vx+ex/t;vy=Math.sin(this.shooterAngle)*magnitude+r.vy+ey/t;
+          const angle=c.archetype==='double_turret'&&c.autoAim?this.doubleTurretAngle(this.nextTurret):this.shooterAngle;
+          vx=Math.cos(angle)*magnitude+r.vx+ex/t;vy=Math.sin(angle)*magnitude+r.vy+ey/t;
         }
         // 0% SOTM means a moving scoring shot cannot land in the hub opening.
         // Passing still works; once stopped, the normal stationary spread applies.
@@ -263,6 +275,7 @@
         }
         this.balls.push({...ball(ox,oy,launch),vx,vy,vz:(h.z-launch+.5*G*t*t)/t,
           shot:!passing,pass:passing,shooter:c.alliance,eligible:!passing,launchTime:this.time,lane});
+        if(c.archetype==='double_turret')this.nextTurret=1-this.nextTurret;
         this.inventory--;if(passing)this.passed++;else this.fired++;
       }
       return count;
@@ -391,7 +404,9 @@
       if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;r.shootingSpeedLimited=false;}
       this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
-      if(c.archetype==='turret'&&c.autoAim){
+      // Team 316 cannot run the intake while actively shooting or passing on the move.
+      if(c.disableIntakeWhileMovingShot&&wantsFire&&this.inventory>0&&Math.hypot(r.vx,r.vy)>.15)this.intake=false;
+      if(['turret','double_turret'].includes(c.archetype)&&c.autoAim){
         const error=Math.atan2(Math.sin(this.aimAngle-this.turretAngle),Math.cos(this.aimAngle-this.turretAngle));
         this.turretAngle+=this.aimPID(this.turretController,error,dt)*dt;
       }else {this.turretAngle=r.a;this.resetAimPID(this.turretController);}
