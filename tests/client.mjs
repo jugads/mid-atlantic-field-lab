@@ -11,7 +11,9 @@ const data={started:true,running:true,time:1,scores:{blue:0,red:0},fleet:sim.fle
 client.frames=[{at:1000,data}];const x=data.fleet[0].robot.x;
 client.apply(sim,1000,{moveX:1});assert(sim.robot.x>x,'local input predicts movement immediately');
 assert.equal(data.fleet[0].robot.x,x,'prediction does not change the authoritative snapshot');
-client.room.status='paused';client.apply(sim,1010,{moveX:1});assert.equal(sim.robot.x,x,'prediction stops when paused');
+const shifted={...data,fleet:[{...data.fleet[0],robot:{...data.fleet[0].robot,x:x+.5}},data.fleet[1]]};
+client.frames=[{at:1016,data:shifted}];client.apply(sim,1016,{moveX:1});assert(sim.robot.x<x+.3,'small corrections are smoothed instead of snapping');
+client.room.status='paused';client.frames=[{at:1030,data}];client.apply(sim,1030,{moveX:1});assert.equal(sim.robot.x,x,'prediction stops when paused');
 const host=new MultiplayerClient(()=>{});host.id='a';host.state='connected';host.room={status:'playing',hostId:'a',players:[{id:'a'},{id:'b'}]};
 host.hostSim=new Simulation();host.hostSim.enableMultiplayer([resolve('341'),resolve('316','red')]);
 const sent=[];host.send=m=>sent.push(m);host.guestInput={moveX:-1};host.guestInputAt=1000;

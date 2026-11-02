@@ -61,6 +61,13 @@ test('disconnect pauses the match and reserved seats resume',()=>{
  const restored=socket();rooms.handle(restored,{type:'resume',code:room.code,token});assert.equal(restored.player,room.players[1]);
  rooms.handle(restored,{type:'pause'});assert.equal(room.status,'playing');
 });
+test('a stalled host pauses the room until fresh snapshots arrive',()=>{
+ const {rooms,a,b,room,setNow}=lobby();rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});setNow(4001);rooms.tick();
+ setNow(6600);rooms.tick();assert.equal(room.status,'paused');assert.equal(room.stalled,true);
+ rooms.handle(b,{type:'pause'});assert.equal(room.status,'paused');
+ rooms.handle(a,{type:'snapshot',time:0,fleet:[{},{}],balls:[],scores:{blue:0,red:0}});
+ rooms.handle(b,{type:'pause'});assert.equal(room.status,'playing');assert.equal(room.stalled,false);
+});
 test('room requires the current protocol and rejects additional players',()=>{
  const {rooms,room}=lobby();const c=socket();rooms.handle(c,{type:'join',code:room.code});assert.equal(c.messages.at(-1).type,'error');
  rooms.handle(c,{type:'join',protocol:2,code:room.code});assert.equal(c.messages.at(-1).type,'error');assert.equal(room.players.length,2);
