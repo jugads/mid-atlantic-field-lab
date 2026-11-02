@@ -1,4 +1,4 @@
-import {MultiplayerClient} from './multiplayer.js?v=host1';
+import {MultiplayerClient} from './multiplayer.js?v=stable1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -70,7 +70,7 @@ function updateMatch(){
  const overlay=$('matchOverlay');overlay.hidden=!(preparing||finished||paused);
  overlay.classList.toggle('countdown',preparing&&!paused);
  let overlayContent='';
- if(paused)overlayContent=online.active?'<strong>MATCH PAUSED</strong><span>'+((online.state==='reconnecting'||online.room.players.some(p=>!p.connected))?'Waiting for both players to reconnect.':'Press P or Resume to continue for both players.')+'</span>':'<strong>MATCH PAUSED</strong><span>Press P or Resume to continue.</span>';
+ if(paused)overlayContent=online.active?'<strong>MATCH PAUSED</strong><span>'+((online.state==='reconnecting'||online.room.players.some(p=>!p.connected))?'Waiting for both players to reconnect.':online.room.stalled?'Waiting for the host to return. Then press P or Resume.':'Press P or Resume to continue for both players.')+'</span>':'<strong>MATCH PAUSED</strong><span>Press P or Resume to continue.</span>';
  else if(preparing)overlayContent=`<strong class="countdown-number">${Math.ceil(online.active?(online.frames.at(-1)?.data.countdown??online.room.countdown):countdown.remaining)}</strong><span>GET READY</span>`;
  else if(finished&&online.active)overlayContent=`<strong>${online.room.mode==='coop'?'CO-OP COMPLETE':'MATCH COMPLETE'}</strong><span>${online.room.mode==='coop'?`Shared blue score: ${sim.scores.blue}`:`Blue ${sim.scores.blue} — ${sim.scores.red} Red`} · Press R to return to the room lobby</span>`;
  else if(finished)overlayContent=`<strong>MATCH COMPLETE</strong><span>Blue ${sim.scores.blue} — ${sim.scores.red} Red · ${sim.recycled} fuel returned · Press R or A to choose again</span>`;
