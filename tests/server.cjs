@@ -12,11 +12,12 @@ const {createServer}=require('../server/index.cjs');
  try{
   assert.equal((await fetch(`http://127.0.0.1:${port}/health`)).status,200);
   assert((await (await fetch(`http://127.0.0.1:${port}/`)).text()).includes('Private room'));
-  const a=await client(),b=await client();send(a,{type:'create',mode:'1v1',team:'341'});const welcome=await wait(a,m=>m.type==='welcome');
-  send(b,{type:'join',code:welcome.code,team:'316'});await wait(b,m=>m.type==='room'&&m.players.length===2);
-  send(a,{type:'ready',ready:true});send(b,{type:'ready',ready:true});const snapshot=await wait(b,m=>m.type==='snapshot'&&m.started);
-  assert.equal(snapshot.fleet.length,2);assert.equal(snapshot.fleet[1].config.alliance,'red');assert.equal(snapshot.initialCenterCount,392);
-  send(a,{type:'input',input:{moveX:-1}});await wait(a,m=>m.type==='snapshot'&&m.fleet[0].robot.vx<0);
+  const a=await client(),b=await client();send(a,{type:'create',protocol:2,mode:'1v1',team:'341'});const welcome=await wait(a,m=>m.type==='welcome');
+  send(b,{type:'join',protocol:2,code:welcome.code,team:'316'});await wait(b,m=>m.type==='room'&&m.players.length===2);
+  send(a,{type:'ready',ready:true});send(b,{type:'ready',ready:true});await wait(a,m=>m.type==='room'&&m.status==='playing');
+  send(b,{type:'input',input:{moveX:-1}});await wait(a,m=>m.type==='guest_input'&&m.input.moveX===-1);
+  send(a,{type:'snapshot',time:1,started:true,running:true,fleet:[{},{}],balls:[],scores:{blue:0,red:0}});
+  const snapshot=await wait(b,m=>m.type==='snapshot');assert.equal(snapshot.fleet.length,2);
   b.close();await wait(a,m=>m.type==='room'&&m.status==='paused');
   await assert.rejects(client('https://unapproved.example'));
   console.log('PASS HTTP health/static routes, two real WebSockets, room/countdown/shared world, inputs, disconnect pause and origin rejection');

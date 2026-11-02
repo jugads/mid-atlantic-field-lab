@@ -15,7 +15,7 @@ function createServer({maxRooms=Number(process.env.MAX_ROOMS)||4,allowedOrigins=
     fs.readFile(file,(err,data)=>{if(err){res.writeHead(404);res.end('Not found');return;}
       res.writeHead(200,{'Content-Type':types[path.extname(file)]||'application/octet-stream','Cache-Control':'no-cache','X-Content-Type-Options':'nosniff'});res.end(req.method==='HEAD'?undefined:data);});
   });
-  const wss=new WebSocketServer({noServer:true,maxPayload:4096,perMessageDeflate:false});
+  const wss=new WebSocketServer({noServer:true,maxPayload:65536,perMessageDeflate:false});
   const origins=new Set(allowedOrigins.split(',').map(s=>s.trim()));
   server.on('upgrade',(req,socket,head)=>{
     let okOrigin=false;
@@ -34,12 +34,7 @@ function createServer({maxRooms=Number(process.env.MAX_ROOMS)||4,allowedOrigins=
     });
     socket.on('close',()=>rooms.disconnect(socket));
   });
-  let accumulator=0,last=performance.now(),snapTime=0;
-  const timer=autoTick?setInterval(()=>{
-    const now=performance.now();accumulator+=Math.min(.1,(now-last)/1000);last=now;
-    while(accumulator>=1/120){rooms.tick(1/120);accumulator-=1/120;}
-    if(now-snapTime>=50){rooms.snapshots();snapTime=now;}
-  },8):null;
+  const timer=autoTick?setInterval(()=>rooms.tick(),50):null;
   const heartbeat=setInterval(()=>{for(const s of wss.clients){if(!s.alive){s.terminate();continue;}s.alive=false;s.ping();}},5000);
   async function close(){clearInterval(timer);clearInterval(heartbeat);for(const socket of wss.clients)socket.terminate();await new Promise(resolve=>wss.close(resolve));await new Promise(resolve=>server.close(resolve));}
   return {server,rooms,wss,close};
