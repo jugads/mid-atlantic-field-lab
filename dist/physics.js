@@ -221,7 +221,7 @@
       const r=this.robot,c=this.config,ex=Math.abs(Math.cos(r.a))*c.length/2+Math.abs(Math.sin(r.a))*c.width/2,
         ey=Math.abs(Math.sin(r.a))*c.length/2+Math.abs(Math.cos(r.a))*c.width/2;
       r.x=clamp(r.x,ex,W-ex);r.y=clamp(r.y,ey,H-ey);
-      const obstacles=[...solids,...this.parked.map(p=>({x:p.robot.x,y:p.robot.y,width:p.config.length,depth:p.config.width,a:p.robot.a}))];
+      const obstacles=[...solids,...(this.multiplayer?[]:this.parked.map(p=>({x:p.robot.x,y:p.robot.y,width:p.config.length,depth:p.config.width,a:p.robot.a})))];
       if(clearanceHeight(c,this.inventory)+r.z>FIELD.trenchClearance)for(const t of trenches)obstacles.push({...t,height:1.022});
       for(let i=0;i<3;i++)for(const b of obstacles){if(b.height!==undefined&&(r.z>=b.height||r.z+clearanceHeight(c,this.inventory)<=(b.bottom||0)))continue;
         const reach=Math.hypot(c.length,c.width)/2+Math.hypot(b.width,b.depth)/2;
@@ -229,6 +229,25 @@
         const hit=rectangleContact(r,c.length,c.width,b);if(!hit)continue;
         r.x+=hit.nx*(hit.depth+.00001);r.y+=hit.ny*(hit.depth+.00001);const v=r.vx*hit.nx+r.vy*hit.ny;
         if(v<0){r.vx-=v*hit.nx;r.vy-=v*hit.ny;}}
+      if(this.multiplayer)for(const other of this.parked){
+        const o=other.robot,oc=other.config;
+        if(r.z>=o.z+oc.height||o.z>=r.z+c.height)continue;
+        const hit=rectangleContact(r,c.length,c.width,{x:o.x,y:o.y,width:oc.length,depth:oc.width,a:o.a});
+        if(!hit)continue;
+        // Approximate equal chassis weight plus the actual carried fuel. A small
+        // restitution models padded bumpers; tangential friction makes sustained
+        // contact resist sliding past a defender.
+        const invA=1/(c.mass||54+(this.inventory||0)*.2268),invB=1/(oc.mass||54+(other.inventory||0)*.2268),sum=invA+invB;
+        const {nx,ny,depth}=hit,move=depth+.00001;
+        r.x+=nx*move*invA/sum;r.y+=ny*move*invA/sum;o.x-=nx*move*invB/sum;o.y-=ny*move*invB/sum;
+        const rvx=r.vx-o.vx,rvy=r.vy-o.vy,normal=rvx*nx+rvy*ny;
+        if(normal<0){
+          const impulse=-(1+.05)*normal/sum,tx=-ny,ty=nx,tangent=rvx*tx+rvy*ty;
+          const friction=clamp(-tangent/sum,-impulse*.8,impulse*.8);
+          const ix=impulse*nx+friction*tx,iy=impulse*ny+friction*ty;
+          r.vx+=ix*invA;r.vy+=iy*invA;o.vx-=ix*invB;o.vy-=iy*invB;
+        }
+      }
     }
     updatePose(dt=0){const r=this.robot,c=this.config,ca=Math.cos(r.a),sa=Math.sin(r.a),l=c.length*.34,w=c.width*.34;
       const fl=terrainHeight(r.x+ca*l-sa*w,r.y+sa*l+ca*w),fr=terrainHeight(r.x+ca*l+sa*w,r.y+sa*l-ca*w),
