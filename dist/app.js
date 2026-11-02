@@ -1,4 +1,4 @@
-import {MultiplayerClient} from './multiplayer.js?v=nonet1';
+import {MultiplayerClient} from './multiplayer.js?v=lagfix2';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -109,7 +109,7 @@ function frame(now){
  const input=blocked?{}:{up,down,left,right,...view.movement(x,y),forward:clamp(Number(up)-Number(down)-gamepad.y,-1,1),tankTurn:gamepad.x,
    turnAxis:gamepad.turn,clockwise:keys.has('KeyE')||keys.has('ArrowRight'),counterclockwise:keys.has('KeyQ')||keys.has('ArrowLeft'),shoot:keys.has('Space')||(gamepad.shoot&&!suppressGamepadShoot),intake:keys.has('ShiftLeft')||gamepad.intake};
  if(online.active){
-   online.input(input,now);online.apply(sim,now);refreshIdentity();
+   online.input(input,now);online.apply(sim,now,input);refreshIdentity();
    $('connectionBadge').textContent=online.state==='connected'?`${online.room.mode==='coop'?'CO-OP':'1v1'} · ${online.rtt} ms`: 'RECONNECTING';
  }else{
    sim.intake=sim.controlsEnabled&&!!input.intake;

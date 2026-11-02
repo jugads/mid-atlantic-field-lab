@@ -53,7 +53,7 @@ export class MultiplayerClient{
     if(now-this.lastPing>2000){this.send({type:'ping',sent:now});this.lastPing=now;}
     if(now-this.lastMessage>10000)this.socket?.close();
   }
-  apply(sim,now){
+  apply(sim,now,input={}){
     if(!this.frames.length)return;
     const renderAt=now-50;
     let a=this.frames[0],b=this.frames.at(-1);
@@ -71,6 +71,17 @@ export class MultiplayerClient{
     sim.activeIndex=Math.max(0,this.room?.players.findIndex(p=>p.id===this.id)??0);
     const me=sim.fleet[sim.activeIndex];if(!me)return;
     sim.config=me.config;sim.robot=me.robot;sim.inventory=me.inventory;sim.turretAngle=me.turretAngle;sim.intake=me.intake;sim.score=data.scores[me.config.alliance];
+    // Predict only our chassis using the same drive and field-collision model as
+    // the server. Scoring, fuel, and all authoritative state still come from snapshots.
+    // Bound prediction to keep a delayed connection from driving through obstacles.
+    const latest=this.frames.at(-1),latestMe=latest.data.fleet[sim.activeIndex];
+    if(latestMe&&this.state==='connected'&&this.room?.status==='playing'&&latest.data.running&&sim.controlsEnabled){
+      Object.assign(me.robot,latestMe.robot);
+      let lead=Math.min(.15,Math.max(0,(now-latest.at+this.rtt/2)/1000));
+      const lock=input.shoot&&me.inventory>0&&me.config.autoAim&&me.config.archetype==='dumper'&&me.config.aimLockWhileShooting;
+      const controls=lock?{...input,clockwise:false,counterclockwise:false,turnAxis:0,tankTurn:0}:input;
+      while(lead>1e-6){const dt=Math.min(lead,1/120);sim.drive(dt,controls);lead-=dt;}
+    }
     const previous=new Map(a.data.balls.map(ball=>[ball[0],ball]));
     sim.balls=data.balls.map(ball=>{const old=previous.get(ball[0])||ball;return {x:lerp(old[1],ball[1]),y:lerp(old[2],ball[2]),z:lerp(old[3],ball[3])};});
     sim.flashes=[];

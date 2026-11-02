@@ -223,7 +223,10 @@
       r.x=clamp(r.x,ex,W-ex);r.y=clamp(r.y,ey,H-ey);
       const obstacles=[...solids,...this.parked.map(p=>({x:p.robot.x,y:p.robot.y,width:p.config.length,depth:p.config.width,a:p.robot.a}))];
       if(clearanceHeight(c,this.inventory)+r.z>FIELD.trenchClearance)for(const t of trenches)obstacles.push({...t,height:1.022});
-      for(let i=0;i<3;i++)for(const b of obstacles){if(b.height!==undefined&&(r.z>=b.height||r.z+clearanceHeight(c,this.inventory)<=(b.bottom||0)))continue;const hit=rectangleContact(r,c.length,c.width,b);if(!hit)continue;
+      for(let i=0;i<3;i++)for(const b of obstacles){if(b.height!==undefined&&(r.z>=b.height||r.z+clearanceHeight(c,this.inventory)<=(b.bottom||0)))continue;
+        const reach=Math.hypot(c.length,c.width)/2+Math.hypot(b.width,b.depth)/2;
+        if(Math.abs(r.x-b.x)>reach||Math.abs(r.y-b.y)>reach)continue;
+        const hit=rectangleContact(r,c.length,c.width,b);if(!hit)continue;
         r.x+=hit.nx*(hit.depth+.00001);r.y+=hit.ny*(hit.depth+.00001);const v=r.vx*hit.nx+r.vy*hit.ny;
         if(v<0){r.vx-=v*hit.nx;r.vy-=v*hit.ny;}}
     }
@@ -312,6 +315,7 @@
     }
     collideBallBox(b,box,restitution=.4){
       const bottom=box.bottom||0;if(b.z-BR>box.height||b.z+BR<bottom)return;
+      if(Math.abs(b.x-box.x)>box.width/2+BR||Math.abs(b.y-box.y)>box.depth/2+BR)return;
       const closestX=clamp(b.x,box.x-box.width/2,box.x+box.width/2),closestY=clamp(b.y,box.y-box.depth/2,box.y+box.depth/2),closestZ=clamp(b.z,bottom,box.height);
       let dx=b.x-closestX,dy=b.y-closestY,dz=b.z-closestZ,d=Math.hypot(dx,dy,dz);if(d>=BR)return;
       if(d<1e-7){
