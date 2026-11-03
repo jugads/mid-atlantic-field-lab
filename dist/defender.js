@@ -18,22 +18,41 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
   if(scoring){
     let states=scoringState.get(sim);if(!states){states=new Map();scoringState.set(sim,states);}
     let state=states.get(botIndex);
-    if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null};states.set(botIndex,state);}
+    if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null,route:null};states.set(botIndex,state);}
     state.lastTime=sim.time;
+    if(state.phase!==sim.phase.id){
+      state.phase=sim.phase.id;
+      state.collecting=defender.inventory<defender.config.capacity&&(!Number.isFinite(sim.phaseRemaining)||sim.phaseRemaining>4);
+      state.since=sim.time;state.target=null;state.route=null;state.lane=null;
+    }
     if(defender.inventory===0&&!state.collecting){state.collecting=true;state.since=sim.time;state.target=null;}
     // Fill the hopper before shooting; leave time to score before the shift ends.
-    if(state.collecting&&(defender.inventory>=defender.config.capacity||(defender.inventory>0&&Number.isFinite(sim.phaseRemaining)&&sim.phaseRemaining<=5))){state.collecting=false;state.target=null;state.lane=null;}
+    if(state.collecting&&(defender.inventory>=defender.config.capacity||(defender.inventory>0&&Number.isFinite(sim.phaseRemaining)&&sim.phaseRemaining<=4))){state.collecting=false;state.target=null;state.lane=null;}
+    // Cross the entire structure before re-planning. Crossing the alliance-line
+    // alone does not mean the back of the chassis has cleared the divider.
     const crossTrench=(towardHome)=>{
-      if(state.lane===null||state.routeHome!==towardHome){state.lane=r.y<8.07/2?.69:8.07-.69;state.routeHome=towardHome;}
-      const lane=state.lane;
-      const neutral=red?16.54-4.03-1.8:4.03+1.8;
-      const inside=red?16.54-4.03+.9:4.03-.9;
-      const before=towardHome?neutral:inside,after=towardHome?inside:neutral;
-      if(Math.abs(r.y-lane)>.12)return driveTo(before,lane,true,1);
-      return driveTo(after,lane,true,1);
+      if(!state.route||state.route.towardHome!==towardHome){
+        const lane=r.y<8.07/2?.69:8.07-.69;
+        const half=defender.config.length/2+.18;
+        const homeEdge=red?16.54-4.03+half:4.03-half;
+        const neutralEdge=red?16.54-4.03-1.194-half:4.03+1.194+half;
+        state.route={towardHome,lane,entry:towardHome?neutralEdge:homeEdge,exit:towardHome?homeEdge:neutralEdge};
+      }
+      const route=state.route,dir=Math.sign(route.exit-route.entry);
+      const passed=dir>0?r.x>=route.exit-.10:r.x<=route.exit+.10;
+      if(passed){state.route=null;return null;}
+      // First get fully clear of the hub before strafing into the lane.
+      const entryClear=dir>0?r.x<=route.entry+.12:r.x>=route.entry-.12;
+      if(!entryClear&&Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,r.y,true,1);
+      if(Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,route.lane,true,1);
+      // Face straight down the trench before moving, so the corners clear it.
+      const angle=dir>0?0:Math.PI,error=Math.atan2(Math.sin(angle-r.a),Math.cos(angle-r.a));
+      if(Math.abs(error)>.14)return {turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
+      return {moveX:dir,moveY:Math.max(-.25,Math.min(.25,(route.lane-r.y)*2)),turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
     };
+    if(state.route){const crossing=crossTrench(state.route.towardHome);if(crossing)return crossing;}
     if(!state.collecting&&defender.inventory>0){
-      if(!home)return crossTrench(true);
+      if(!home){const crossing=crossTrench(true);if(crossing)return crossing;}
       return {shoot:true};
     }
     // Seek loose fuel in home or the neutral zone, staying on our side of
@@ -41,6 +60,7 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const centerSafe=defender.config.length/2+.1;
     const eligible=b=>!b.shot&&!b.hubInside&&b.z<.3&&
       (red?b.x>=4.03:b.x<=16.54-4.03)&&
+      (!Number.isFinite(sim.phaseRemaining)||sim.phaseRemaining>4||(red?b.x>=16.54-4.03:b.x<=4.03))&&
       (sim.phase.id!=='auto'||(red?b.x>=16.54/2+centerSafe:b.x<=16.54/2-centerSafe));
     // Keep pursuing a chosen ball instead of oscillating between nearby targets.
     if(state.target&&(!sim.balls.includes(state.target)||!eligible(state.target)))state.target=null;
@@ -65,11 +85,11 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const ball=state.target;
     if(ball){
       const ballHome=red?ball.x>=16.54-4.03:ball.x<=4.03;
-      if(home!==ballHome)return crossTrench(ballHome);
+      if(home!==ballHome){const crossing=crossTrench(ballHome);if(crossing)return crossing;}
       state.lane=null;
       return driveTo(ball.x,ball.y,true,1,true);
     }
-    if(defender.inventory){state.collecting=false;return home?{shoot:true}:crossTrench(true);}
+    if(defender.inventory){state.collecting=false;return home?{shoot:true}:(crossTrench(true)||{shoot:true});}
     return {};
   }
   const distance=Math.hypot(player.x-r.x,player.y-r.y),lead=easy?0:Math.min(hard?.7:.16,distance/(hard?6:12));
