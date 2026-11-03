@@ -76,7 +76,7 @@ test('bump slope lifts and pitches chassis; trench rejects tall robots',()=>{
  const b=bumps[0];assert(Math.abs(terrainHeight(b.x,b.y)-.1654)<1e-8);assert(terrainHeight(b.x-.4,b.y)<terrainHeight(b.x,b.y));
  const s=empty();s.robot.x=b.x-.3;s.robot.y=b.y;s.updatePose();assert(s.robot.z>0);assert(s.robot.pitch>0);
  const tr=trenches[0],low=empty({height:.52});low.start();low.time=25;low.robot.x=tr.x-1;low.robot.y=tr.y;advance(low,1,{right:true});assert(low.robot.x>tr.x+.6);
- const tall=empty({height:.8});tall.start();tall.time=25;tall.robot.x=tr.x-1;tall.robot.y=tr.y;advance(tall,1,{right:true});assert(tall.robot.x<tr.x-FIELD.hubSize/2);
+ const tall=empty({height:.8});tall.start();tall.time=25;tall.robot.x=tr.x-1;tall.robot.y=tr.y;advance(tall,1,{right:true});assert(tall.robot.x<tr.x-.08-tall.config.length/2+.03);assert(tall.robot.x>tr.x-FIELD.hubSize/2-tall.config.length/2+.1,'tall chassis reaches actual beam instead of the tape line');
 });
 test('turning alone does not translate swerve',()=>{
  const s=empty();s.start();s.time=25;const x=s.robot.x,y=s.robot.y;advance(s,.15,{clockwise:true});assert(s.robot.a>0);assert(Math.hypot(s.robot.x-x,s.robot.y-y)<.001);
@@ -388,7 +388,7 @@ test('trench clearance depends on robot height, not fuel inventory',()=>{
   for(const inventory of [0,c.capacity]){
    s.inventory=inventory;Object.assign(s.robot,{x:tr.x,y:tr.y,z:0,a:0,vx:0,vy:0});s.resolveRobot();
    if(canUseTrench(c))assert.equal(s.robot.x,tr.x,'short robot must clear the trench when full');
-   else assert(Math.abs(s.robot.x-tr.x)>tr.width/2,'tall robot must collide with the trench');
+   else assert(Math.abs(s.robot.x-tr.x)>=.08+c.length/2-1e-4,'tall robot must collide with the beam');
   }
  }
 });

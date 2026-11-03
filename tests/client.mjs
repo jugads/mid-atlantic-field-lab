@@ -42,3 +42,9 @@ Object.assign(four.fleet[2].robot,{x:7,y:3,a:0,vx:0,vy:0});Object.assign(four.fl
 host2.guestInput={};host2.guestInputAt=1100;host2.advanceHost(1200,{});
 assert(four.fleet[2].robot.x<7,'blue bot chases red human instead of red bot');
 console.log('PASS 2v2 bots defend the opposing humans');
+const solo3=createHostSimulation({mode:'3v3solo',players:[{id:'a',team:'341',alliance:'blue'}]});
+const room3=createHostSimulation({mode:'3v3',players:[{id:'a',team:'341',alliance:'blue'},{id:'b',team:'708',alliance:'red'}]});
+for(const s of [solo3,room3]){assert.equal(s.fleet.length,6);assert.equal(s.fleet.filter(e=>e.config.alliance==='blue').length,3);assert.equal(s.fleet.filter(e=>e.config.alliance==='red').length,3);assert.equal(s.initialCenterCount,360);}
+const {matchInputs}=await import('../dist/multiplayer.js');solo3.start();const ci=matchInputs(solo3,[{}]);assert.equal(ci.length,6);assert(ci.slice(1).every(c=>typeof c==='object'));
+const host3=new MultiplayerClient(()=>{});host3.id='a';host3.state='connected';host3.room={mode:'3v3',players:[{id:'a',team:'341',alliance:'blue'},{id:'b',team:'708',alliance:'red'}],status:'playing',hostId:'a'};host3.hostSim=room3;const messages3=[];host3.send=m=>messages3.push(m);host3.advanceHost(1000,{});host3.advanceHost(1100,{});assert(messages3.some(m=>m.type==='snapshot'&&m.fleet.length===6));assert(JSON.stringify(messages3.at(-1)).length<65536);
+console.log('PASS 3v3 rosters, AI controls and snapshots');

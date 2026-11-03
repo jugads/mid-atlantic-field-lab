@@ -211,3 +211,13 @@ for(const alliance of ['blue','red']){
  for(let i=0;i<3*120;i++)s.step(1/120,[{},defenderInput(s,'hard')]);assert(s.fleet[1].robot.y>5,`${alliance} defender must move around hub to other bump`);
 }
 console.log('Hard defense contests bump crossings and switches lanes');
+// Start the attacker in neutral with room to accelerate. A same-lane hard
+// defender should step forward early enough to deny a straight return.
+for(const alliance of ['blue','red'])for(const y of [2.51,5.56]){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('708',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;s.balls=[];
+ const sign=alliance==='blue'?1:-1,hub=alliance==='blue'?4.627:11.913;
+ Object.assign(s.fleet[0].robot,{x:hub+sign*3.373,y,a:0,vx:0,vy:0});Object.assign(s.fleet[1].robot,{x:hub+sign*.873,y,a:0,vx:0,vy:0});
+ let closest=Infinity;for(let i=0;i<5*120;i++){s.step(1/120,[{moveX:-sign},defenderInput(s,'hard')]);closest=Math.min(closest,(s.fleet[0].robot.x-hub)*sign);}
+ assert(closest>-.2,`${alliance} returning robot slipped past defender at y=${y}: ${closest.toFixed(2)}m`);
+}
+console.log('Hard defense anticipates a same-lane return from neutral');

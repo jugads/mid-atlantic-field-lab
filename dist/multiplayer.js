@@ -3,8 +3,26 @@ import {defenderInput} from './defender.js';
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
   const roster=room.players.map(p=>resolve(p.team,p.alliance));
-  if(room.mode==='2v2')for(const alliance of ['blue','red'])roster.push({...resolve('2539',alliance),intakeDirection:'front'});
+  const size=room.mode==='3v3'||room.mode==='3v3solo'?3:room.mode==='2v2'?2:0;
+  if(size)for(const alliance of ['blue','red']){
+    const count=roster.filter(r=>r.alliance===alliance).length;
+    for(let i=count;i<size;i++)roster.push({...resolve('2539',alliance),intakeDirection:'front'});
+  }
   const sim=new Simulation();sim.enableMultiplayer(roster);return sim;
+}
+
+
+// Human entries come first; assign each AI to an opposing human where possible,
+// then spread remaining bots across opposing robots.
+export function matchInputs(sim,humanInputs,difficulty='medium'){
+  const count=humanInputs.length,inputs=humanInputs.slice();
+  for(let i=count;i<sim.fleet.length;i++){
+    const enemies=sim.fleet.map((e,j)=>({e,j})).filter(({e})=>e.config.alliance!==sim.fleet[i].config.alliance);
+    const human=enemies.find(({j})=>j<count),ordinal=sim.fleet.slice(count,i).filter(e=>e.config.alliance===sim.fleet[i].config.alliance).length;
+    const target=(ordinal===0&&human?human:enemies[ordinal%enemies.length]);
+    inputs.push(target?defenderInput(sim,difficulty,i,target.j):{});
+  }
+  return inputs;
 }
 
 /* The room host simulates; the server relays guest controls and host snapshots. */
@@ -79,7 +97,7 @@ export class MultiplayerClient{
     if(playing&&this.hostLast){
       this.hostAccumulator+=Math.min(.1,Math.max(0,(now-this.hostLast)/1000));
       const guest=now-this.guestInputAt<300?this.guestInput:{};
-      while(this.hostAccumulator>=1/120){const inputs=[input,guest];if(this.room.mode==='2v2')inputs.push(defenderInput(s,'medium',2,1),defenderInput(s,'medium',3,0));s.step(1/120,inputs);this.hostAccumulator-=1/120;}
+      while(this.hostAccumulator>=1/120){const humans=[input,guest];s.step(1/120,s.fleet.length>humans.length?matchInputs(s,humans):humans);this.hostAccumulator-=1/120;}
     }
     this.hostLast=playing?now:0;
     if(now-this.lastSnapshot<50)return;

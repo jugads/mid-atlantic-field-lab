@@ -18,6 +18,8 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
   const scoring = sim.phase.id === 'auto' || (sim.activeAt(defender.config.alliance) && !leavingEarly);
+  // A small defensive traction advantage affects contact, not top speed.
+  r.defensePush = !scoring && hard ? 1.06 : 1;
   if (scoring) {
     // All difficulty levels use the same scoring strategy and driving skill.
     const hard = true;

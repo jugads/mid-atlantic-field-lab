@@ -192,9 +192,10 @@ export class FieldView {
       let visual=this.parkedVisuals.get(index);
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
       visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(-pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
-      if(pc.archetype==='turret'&&Number.isFinite(entry.turretAngle))visual.shooter.rotation.y=-(entry.turretAngle-pr.a);
-      if(pc.archetype==='double_turret'&&Number.isFinite(entry.turretAngle))visual.turrets.forEach(turret=>{turret.rotation.y=-(entry.turretAngle-pr.a);});
-      visual.intakeBar.material.color.set(entry.intake?'#c8a5ff':'#665b70');
+      const turretAngle=entry.turretAngle??entry.state?.turretAngle;
+      if(pc.archetype==='turret'&&Number.isFinite(turretAngle))visual.shooter.rotation.y=-(turretAngle-pr.a);
+      if(pc.archetype==='double_turret'&&Number.isFinite(turretAngle))visual.turrets.forEach(turret=>{turret.rotation.y=-(turretAngle-pr.a);});
+      visual.intakeBar.material.color.set((entry.intake??entry.state?.intake)?'#c8a5ff':'#665b70');
     });
     for(const [index,visual] of this.parkedVisuals)if(!parkedKeys.has(index)){this.disposeGroup(visual.group);this.scene.remove(visual.group);this.parkedVisuals.delete(index);}
     this.fuel.count=sim.balls.length;
