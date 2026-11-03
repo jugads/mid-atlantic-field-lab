@@ -89,13 +89,14 @@ test('releasing drive controls applies strong braking without changing accelerat
 });
 test('user-supplied team builds resolve with the requested specifications',()=>{
  const p341=resolvePreset('341'),p316=resolvePreset('316'),p1391=resolvePreset('1391'),p8513=resolvePreset('8513');
- assert.equal(Object.keys(profiles).length,8);
+ assert.equal(Object.keys(profiles).length,9);
  assert.equal(p341.capacity,8);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
  assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
  assert.equal(p1391.capacity,45);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
  assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
  const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.intakeRate,35);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
+ const p1640=resolvePreset('1640');assert.equal(p1640.archetype,'turret');assert.equal(p1640.capacity,40);assert.equal(p1640.feedRate,10);assert.equal(p1640.intakeRate,25);assert.equal(p1640.moving,60);assert.equal(p1640.width,p316.width);assert.equal(p1640.length,p316.length);assert.equal(p1640.height,p316.height);assert(canUseTrench(p1640));
  const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.capacity,35);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
 });
