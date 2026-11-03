@@ -184,3 +184,14 @@ for(let i=0;i<18*120;i++){
 }
 assert.equal(sameScorers[0].scores.red,sameScorers[2].scores.red,'scoring outcome is identical');
 console.log('All difficulty levels share identical scoring controls and team');
+// An approaching bump robot is actively met on either side of either lane,
+// for both alliances; pin release still takes precedence over this behavior.
+for(const alliance of ['blue','red'])for(const y of [2.51,5.56])for(const homeSide of [-1,1]){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('8513',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;s.balls=[];
+ const hub=alliance==='blue'?4.627:11.913;
+ Object.assign(s.fleet[0].robot,{x:hub+homeSide*.8,y,a:0,vx:-homeSide*2,vy:0});
+ Object.assign(s.fleet[1].robot,{x:hub-homeSide*.9,y,a:0,vx:0,vy:0});
+ const command=defenderInput(s,'hard');assert(command.moveX*homeSide>.5,`${alliance} defender meets bump robot at y=${y}, side=${homeSide}`);
+ s.pinCounts=[{attacker:1,victim:0,elapsed:2.2}];const release=defenderInput(s,'hard');assert(release.moveX*homeSide<0,'pin release overrides bump pressure');
+}
+console.log('Defense actively meets approaching bump robots on both sides');
