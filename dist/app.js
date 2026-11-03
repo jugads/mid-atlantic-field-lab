@@ -1,6 +1,6 @@
-import {defenderInput,defenderTeam} from './defender.js?v=roster15';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=roster15';
-import {FieldView} from './view3d.js?v=roster15';
+import {defenderInput,defenderTeam} from './defender.js?v=turret16';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=turret16';
+import {FieldView} from './view3d.js?v=turret16';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),

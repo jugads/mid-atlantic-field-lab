@@ -2,7 +2,7 @@
 export const defenderTeam = () => '316';
 const scoringState = new WeakMap();
 const defenseState = new WeakMap();
-export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
+function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
   const defender = sim.fleet[botIndex], player = sim.fleet[opponentIndex].robot, r = defender.robot;
   const hard = difficulty === 'hard', easy = difficulty === 'easy';
   const defenseSpeed = 1;
@@ -332,4 +332,16 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
     return { moveX: mx, moveY: my, turnAxis: Math.max(-1, Math.min(1, err * 1.5)), intake: true };
   }
   return driveTo(ds.observed.x + ds.observed.vx * lead, ds.observed.y + ds.observed.vy * lead);
+}
+
+// Swiveling shooters can score while following their normal collection or
+// evasion route. Only fire inside their scoring zone and effective range.
+export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
+  const input = planDefenderInput(sim, difficulty, botIndex, opponentIndex);
+  const bot = sim.fleet[botIndex], c = bot.config, r = bot.robot;
+  const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
+  const home = c.alliance === 'red' ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
+  const hubX = c.alliance === 'red' ? 16.54 - 4.627 : 4.627;
+  if (active && home && bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange) input.shoot = true;
+  return input;
 }
