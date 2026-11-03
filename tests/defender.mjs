@@ -98,3 +98,11 @@ for(let i=0;i<20*120;i++){
 assert(bursts>=3,`hard 316 should shoot three loads in its shift, got ${bursts}`);
 assert(hardShift.scores.red>=75,`hard 316 should score substantially during its shift, got ${hardShift.scores.red}`);
 console.log('Hard team 316 completes three scoring cycles before defense');
+// A stationary defender blocking either trench must not trap the scoring bot.
+for(const y of [.69,7.38]){
+ const blocked=new Simulation({},()=>.5);blocked.enableMultiplayer([resolve('341'),resolve('316','red')]);blocked.start();blocked.time=33;blocked.autoWinner='blue';
+ Object.assign(blocked.fleet[0].robot,{x:11.9,y,a:0});
+ for(let i=0;i<20*120;i++)blocked.step(1/120,[{},defenderInput(blocked,'hard')]);
+ assert(blocked.scores.red>=30,`hard AI should score around a robot blocking trench y=${y}; got ${blocked.scores.red}`);
+}
+console.log('Hard scoring AI navigates around blocked trenches');
