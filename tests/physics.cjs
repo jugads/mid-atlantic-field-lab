@@ -398,3 +398,7 @@ if(!process.argv.includes('--quick'))test('full 166-second match keeps fuel cons
  assert(s.balls.every(b=>[b.x,b.y,b.z,b.vx,b.vy,b.vz].every(Number.isFinite)));
 });
 console.log(`${passed} physics and match tests passed.`);
+test('scored shots and passes are attributed to the firing robot and period',()=>{
+ const {resolve}=require('../dist/team-presets.js'),s=new Simulation();s.enableMultiplayer([resolve('316','blue'),resolve('9094','red')]);s.start();s.time=40;s.autoWinner='blue';s.loadDriver(1);s.robot.x=14;s.turretAngle=s.aimAngle;
+ assert.equal(s.fire(1),1);const shot=s.balls.at(-1);assert.equal(shot.shooterIndex,1);s.processHub(shot,hubs[1]);assert.equal(s.matchStats.robots[1].shots,1);assert.equal(s.matchStats.robots[1].points,1);assert.equal(s.matchStats.periods.shift1.red,1);
+});
