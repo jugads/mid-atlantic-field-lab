@@ -18,3 +18,7 @@ function move(e,x,y){Object.assign(e.robot,{x,y,a:0,vx:0,vy:0,z:0});}
  const s=match(),[blue,red]=s.fleet;s.time=133;move(blue,3,2);move(red,3.8,2);s.assessFouls();assert.equal(s.scores.blue+s.scores.red,0,'ordinary defense is legal');
 }
 console.log('PASS AUTO and tower foul scoring');
+{
+ const s=match(),[blue,red]=s.fleet;move(blue,8.2,2);move(red,8.9,2);s.assessFouls();
+ move(blue,8.9,2);move(red,9.6,2);s.assessFouls();assert.equal(s.scores.red,30,'crossing during existing contact counts crossing and contact');
+}
