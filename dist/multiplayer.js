@@ -1,3 +1,12 @@
+import {defenderInput} from './defender.js';
+
+export function createHostSimulation(room){
+  const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
+  const roster=room.players.map(p=>resolve(p.team,p.alliance));
+  if(room.mode==='2v2')for(const alliance of ['blue','red'])roster.push({...resolve('2539',alliance),intakeDirection:'front'});
+  const sim=new Simulation();sim.enableMultiplayer(roster);return sim;
+}
+
 /* The room host simulates; the server relays guest controls and host snapshots. */
 export class MultiplayerClient{
   constructor(onChange){this.onChange=onChange;this.room=null;this.id=null;this.token=null;this.socket=null;this.frames=[];this.message='';this.state='offline';this.rtt=0;this.lastInput=0;this.lastMessage=0;this.lastPing=0;this.retry=0;this.timer=null;this.epoch=0;this.hostSim=null;this.guestInput={};this.guestInputAt=0;this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;this.lastSnapshot=0;this.visualRobot=null;this.visualAt=0;}
@@ -24,8 +33,7 @@ export class MultiplayerClient{
         const prior=this.room;this.room=msg;
         if(msg.status==='lobby'&&prior?.status!=='lobby'){this.frames=[];this.hostSim=null;this.hostLast=0;}
         if(msg.status==='countdown'&&msg.hostId===this.id&&!this.hostSim){
-          const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
-          this.hostSim=new Simulation();this.hostSim.enableMultiplayer(msg.players.map(p=>resolve(p.team,p.alliance)));
+          this.hostSim=createHostSimulation(msg);
           this.ballIds=new WeakMap();this.nextBallId=1;this.hostAccumulator=0;this.hostLast=0;
         }
         if(prior?.status!==msg.status){this.hostLast=0;this.hostAccumulator=0;this.guestInput={};this.visualRobot=null;}
@@ -71,7 +79,7 @@ export class MultiplayerClient{
     if(playing&&this.hostLast){
       this.hostAccumulator+=Math.min(.1,Math.max(0,(now-this.hostLast)/1000));
       const guest=now-this.guestInputAt<300?this.guestInput:{};
-      while(this.hostAccumulator>=1/120){s.step(1/120,[input,guest]);this.hostAccumulator-=1/120;}
+      while(this.hostAccumulator>=1/120){const inputs=[input,guest];if(this.room.mode==='2v2')inputs.push(defenderInput(s,'medium',2,3),defenderInput(s,'medium',3,2));s.step(1/120,inputs);this.hostAccumulator-=1/120;}
     }
     this.hostLast=playing?now:0;
     if(now-this.lastSnapshot<50)return;

@@ -1,5 +1,5 @@
-import {defenderInput} from './defender.js?v=driving3';
-import {MultiplayerClient} from './multiplayer.js?v=fouls1';
+import {defenderInput} from './defender.js?v=2v2';
+import {MultiplayerClient} from './multiplayer.js?v=2v2';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -113,7 +113,7 @@ function frame(now){
    turnAxis:gamepad.turn,clockwise:keys.has('KeyE')||keys.has('ArrowRight'),counterclockwise:keys.has('KeyQ')||keys.has('ArrowLeft'),shoot:keys.has('Space')||(gamepad.shoot&&!suppressGamepadShoot),intake:keys.has('ShiftLeft')||gamepad.intake};
  if(online.active){
    online.input(input,now);online.advanceHost(now,input);online.apply(sim,now,input);refreshIdentity();
-   $('connectionBadge').textContent=online.state==='connected'?`${online.room.mode==='coop'?'CO-OP':'1v1'} · ${online.rtt} ms`: 'RECONNECTING';
+   $('connectionBadge').textContent=online.state==='connected'?`${online.room.mode==='coop'?'CO-OP':online.room.mode==='2v2'?'2v2':'1v1'} · ${online.rtt} ms`: 'RECONNECTING';
  }else{
    sim.intake=sim.controlsEnabled&&!!input.intake;
    let matchDt=dt;
@@ -139,8 +139,9 @@ function networkChanged(msg){
  const busy=['connecting','reconnecting'].includes(online.state);
  $('createRoom').disabled=busy;$('joinRoom').disabled=busy;
  if(online.room){
-  $('roomCode').textContent=online.room.code;$('roomDescription').textContent=online.room.mode==='coop'?'CO-OP · SHARED BLUE SCORE':'1v1 · BLUE vs RED';
+  $('roomCode').textContent=online.room.code;$('roomDescription').textContent=online.room.mode==='coop'?'CO-OP · SHARED BLUE SCORE':online.room.mode==='2v2'?'2v2 · ONE BOT PER ALLIANCE':'1v1 · BLUE vs RED';
   $('roomPlayers').replaceChildren(...online.room.players.map(p=>{const row=document.createElement('span');row.textContent=`${p.id===online.id?'You':'Player '+(p.index+1)} · ${p.team} · ${p.alliance.toUpperCase()} — ${!p.connected?'Reconnecting':p.ready?'Ready':'Choosing robot'}`;return row;}));
+  if(online.room.mode==='2v2')for(const alliance of ['blue','red']){const row=document.createElement('span');row.textContent=`AI teammate · 2539 · ${alliance.toUpperCase()}`;$('roomPlayers').append(row);}
   if(online.room.players.length<2){const row=document.createElement('span');row.textContent='Waiting for player 2… Share the room code.';$('roomPlayers').append(row);}
   if(msg?.type==='room'&&online.room.status==='lobby')previewLobby();
  }else if(sim.started||sim.roster.length>1){

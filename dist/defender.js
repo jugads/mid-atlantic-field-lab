@@ -1,7 +1,7 @@
 // Scoring uses full drive speed; defense keeps its established difficulty tuning.
 const scoringState=new WeakMap();
-export function defenderInput(sim, difficulty='medium') {
-  const defender=sim.fleet[1], player=sim.fleet[0].robot, r=defender.robot;
+export function defenderInput(sim, difficulty='medium', botIndex=1, opponentIndex=0) {
+  const defender=sim.fleet[botIndex], player=sim.fleet[opponentIndex].robot, r=defender.robot;
   const hard=difficulty==='hard', easy=difficulty==='easy';
   const defenseSpeed=easy?.40:hard?1:.58;
   const driveTo=(x,y,intake=hard,speed=defenseSpeed,alignIntake=false)=>{
@@ -16,8 +16,9 @@ export function defenderInput(sim, difficulty='medium') {
   const red=defender.config.alliance==='red',home=red?r.x>=16.54-4.03:r.x<=4.03;
   const scoring=sim.phase.id==='auto'||sim.activeAt(defender.config.alliance);
   if(scoring){
-    let state=scoringState.get(sim);
-    if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null};scoringState.set(sim,state);}
+    let states=scoringState.get(sim);if(!states){states=new Map();scoringState.set(sim,states);}
+    let state=states.get(botIndex);
+    if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null};states.set(botIndex,state);}
     state.lastTime=sim.time;
     if(defender.inventory===0&&!state.collecting){state.collecting=true;state.since=sim.time;state.target=null;}
     if(state.collecting&&(defender.inventory>=Math.min(10,defender.config.capacity)||sim.time-state.since>5&&defender.inventory>0)){state.collecting=false;state.target=null;state.lane=null;}
