@@ -36,13 +36,29 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     // alone does not mean the back of the chassis has cleared the divider.
     const crossTrench=(towardHome)=>{
       if(!state.route||state.route.towardHome!==towardHome){
-        const lane=r.y<8.07/2?.69:8.07-.69;
+        // Select an open crossing. A defending robot in the trench should
+        // send us over the adjacent bump rather than into an endless push.
+        const lanes=[.69,2.51,8.07-2.51,8.07-.69];
+        const hubX=red?16.54-4.03-1.194/2:4.03+1.194/2;
+        const lane=lanes.reduce((best,y)=>{
+          const cost=v=>Math.abs(r.y-v)+(Math.abs(player.x-hubX)<2&&Math.abs(player.y-v)<1.25?5:0)+(state.avoidLane&&sim.time<state.avoidLane.until&&Math.abs(v-state.avoidLane.y)<.2?8:0)+(v===.69||v===8.07-.69?0:.35);
+          return cost(y)<cost(best)?y:best;
+        });
         const half=defender.config.length/2+.18;
         const homeEdge=red?16.54-4.03+half:4.03-half;
         const neutralEdge=red?16.54-4.03-1.194-half:4.03+1.194+half;
-        state.route={towardHome,lane,entry:towardHome?neutralEdge:homeEdge,exit:towardHome?homeEdge:neutralEdge};
+        state.route={towardHome,lane,entry:towardHome?neutralEdge:homeEdge,exit:towardHome?homeEdge:neutralEdge,lastX:r.x,lastY:r.y,progressAt:sim.time};
       }
       const route=state.route,dir=Math.sign(route.exit-route.entry);
+      // If contact or a hub corner prevents progress, retreat from the
+      // structure before picking another lane. Do not spin inside a trench.
+      if(Math.hypot(r.x-route.lastX,r.y-route.lastY)>.28){route.lastX=r.x;route.lastY=r.y;route.progressAt=sim.time;}
+      if(sim.time-route.progressAt>1.4){
+        const side=r.x<(red?16.54-4.03-1.194/2:4.03+1.194/2)?-1:1;
+        state.escape={x:(red?16.54-4.03-1.194/2:4.03+1.194/2)+side*1.65,y:r.y,until:sim.time+2};
+        state.avoidLane={y:route.lane,until:sim.time+6};state.route=null;
+        return driveTo(state.escape.x,state.escape.y,true,1);
+      }
       const passed=dir>0?r.x>=route.exit-.10:r.x<=route.exit+.10;
       if(passed){state.route=null;return null;}
       // First get fully clear of the hub before strafing into the lane.
@@ -54,6 +70,10 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       if(Math.abs(error)>.14)return {turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
       return {moveX:dir,moveY:Math.max(-.25,Math.min(.25,(route.lane-r.y)*2)),turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
     };
+    if(state.escape){
+      if(sim.time<state.escape.until&&Math.abs(r.x-state.escape.x)>.2)return driveTo(state.escape.x,state.escape.y,true,1);
+      state.escape=null;
+    }
     if(state.route){const crossing=crossTrench(state.route.towardHome);if(crossing)return crossing;}
     if(!state.collecting&&defender.inventory>0){
       if(!home){const crossing=crossTrench(true);if(crossing)return crossing;}
@@ -91,6 +111,23 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       const ballHome=red?ball.x>=16.54-4.03:ball.x<=4.03;
       if(home!==ballHome){const crossing=crossTrench(ballHome);if(crossing)return crossing;}
       state.lane=null;
+      // In open carpet, steer around an opponent directly between us and the
+      // fuel. Keep the chosen side briefly so the robot does not oscillate.
+      if(hard){
+        if(state.detour&&(sim.time>state.detour.until||Math.hypot(r.x-state.detour.x,r.y-state.detour.y)<.4))state.detour=null;
+        const dx=ball.x-r.x,dy=ball.y-r.y,len=Math.hypot(dx,dy);
+        if(!state.detour&&len>.5){
+          const px=player.x-r.x,py=player.y-r.y,along=(px*dx+py*dy)/len,cross=(px*dy-py*dx)/len;
+          const hubX=red?16.54-4.03-1.194/2:4.03+1.194/2;
+          if(along>.1&&along<Math.min(len,2.5)&&Math.abs(cross)<1.15&&Math.abs(r.x-hubX)>1.6&&Math.abs(player.x-hubX)>1.6){
+            const nx=-dy/len,ny=dx/len,side=cross>=0?1:-1;
+            let x=player.x+nx*side*1.35,y=player.y+ny*side*1.35;
+            if(y<.65||y>7.42){x=player.x-nx*side*1.35;y=player.y-ny*side*1.35;}
+            state.detour={x:Math.max(.65,Math.min(15.89,x)),y:Math.max(.65,Math.min(7.42,y)),until:sim.time+2};
+          }
+        }
+        if(state.detour)return driveTo(state.detour.x,state.detour.y,true,1);
+      }
       return driveTo(ball.x,ball.y,true,1,true);
     }
     if(defender.inventory){state.collecting=false;return home?{shoot:true}:(crossTrench(true)||{shoot:true});}
