@@ -221,3 +221,8 @@ for(const alliance of ['blue','red'])for(const y of [2.51,5.56]){
  assert(closest>-.2,`${alliance} returning robot slipped past defender at y=${y}: ${closest.toFixed(2)}m`);
 }
 console.log('Hard defense anticipates a same-lane return from neutral');
+{
+  const s=new Simulation();s.enableMultiplayer([resolve('316','blue'),resolve('9094','red')]);s.start();s.time=25;s.fleet[1].inventory=10;
+  Object.assign(s.fleet[1].robot,{x:14,y:2});Object.assign(s.fleet[0].robot,{x:2,y:6});s.balls=[{x:14.5,y:2.5,z:0}];
+  const controls=defenderInput(s,'medium',1,0);assert(controls.shoot&&Math.hypot(controls.moveX||0,controls.moveY||0)>0,'turret should shoot while moving to collect');
+}
