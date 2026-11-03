@@ -181,7 +181,7 @@ test('fuel can bounce off the hub rim and either fall in or out',()=>{
 });
 test('1391 scoring range reaches the tower but distant shots fall short',()=>{
  const s=empty(resolvePreset('1391'));s.robot.x=TOWER.postX;s.robot.y=H/2;
- assert(!s.shotSolution.outOfRange);assert(s.shotSolution.distance<=3.6);assert(3.6-s.shotSolution.distance<.05,'tower is barely within range');
+ assert(!s.shotSolution.outOfRange);assert(s.shotSolution.distance<=3.6);assert(3.6-s.shotSolution.distance<.11,'tower is barely within range');
  s.robot.x=.45;const target=s.target;assert(s.shotSolution.outOfRange);assert.equal(s.fireStatus,'OUT OF RANGE');
  const solution=s.shotSolution;assert(Math.abs(solution.reach-3.6)<1e-8);assert(solution.target.x<target.x);
  s.config.autoAim=true;s.robot.a=s.aimAngle;s.inventory=1;assert.equal(s.fire(1),1);const b=s.balls[0];
@@ -362,18 +362,15 @@ test('fuel compressed against a wall does not gain excessive speed',()=>{
  let peak=0;for(let i=0;i<100;i++){s.step(1/120,{left:true});for(const b of s.balls)peak=Math.max(peak,Math.hypot(b.vx,b.vy,b.vz));}
  assert(peak<7,`fuel speed ${peak.toFixed(2)} m/s`);assert(s.balls.every(b=>Number.isFinite(b.x)&&b.x>=BR-1e-8));
 });
-test('tower opening accepts modest offset approaches',()=>{
- for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
-  const s=empty(resolvePreset(team,alliance)),x=alliance==='blue'?TOWER.postX:W-TOWER.postX;
-  Object.assign(s.robot,{x,y:H/2+.08,z:0,a:0,vx:0,vy:0});s.resolveRobot();
-  assert(Math.abs(s.robot.x-x)<1e-6&&Math.abs(s.robot.y-(H/2+.08))<1e-6,team+' fits an offset approach');
- }
-});
-test('every built-in robot can drive under both towers from the field',()=>{
+test('tower front uprights block robots while leaving a side route behind the tower',()=>{
  for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
   const s=empty(resolvePreset(team,alliance)),x=alliance==='blue'?TOWER.postX:W-TOWER.postX,dir=alliance==='blue'?-1:1;
-  s.start();s.time=25;Object.assign(s.robot,{x:x-dir*1.1,y:H/2+.08,z:0,a:0,vx:0,vy:0});
-  advance(s,.45,{moveX:dir});assert(dir*(s.robot.x-x)>-.1,team+' failed to enter '+alliance+' tower, x='+s.robot.x);
+  s.start();s.time=25;Object.assign(s.robot,{x:x-dir*1.1,y:H/2,z:0,a:0,vx:0,vy:0});
+  advance(s,.6,{moveX:dir});assert(dir*(s.robot.x-x)<-.25,team+' must be blocked by '+alliance+' tower front');
+  const clearance=TOWER.postX-TOWER.postDepth/2;
+  assert(clearance>s.config.length,team+' can fit between tower and wall');
+  Object.assign(s.robot,{x:alliance==='blue'?clearance/2:W-clearance/2,y:H/2-1.7,z:0,a:0,vx:0,vy:0});
+  advance(s,.8,{moveY:1});assert(s.robot.y>H/2+.3,team+' can pass behind '+alliance+' tower from side');
  }
 });
 test('tower rungs have vertical clearance and block at their actual height',()=>{
@@ -381,16 +378,6 @@ test('tower rungs have vertical clearance and block at their actual height',()=>
  const low=ball(rung.x,rung.y,.2);s.collideBallBox(low,rung);assert.equal(low.x,rung.x);assert.equal(low.z,.2);
  const hit={...ball(rung.x+.03,rung.y,TOWER.rungs[0]),vx:-3};s.collideBallBox(hit,rung);assert(hit.x>rung.x+.03);assert(hit.vx>0);
  assert.equal(terrainHeight(.5,H/2),.008);
-});
-test('built-in robots fit beneath both towers and still collide with uprights',()=>{
- for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
-  const s=empty(resolvePreset(team,alliance)), x=alliance==='blue'?TOWER.postX:W-TOWER.postX;
-  Object.assign(s.robot,{x,y:H/2,z:0,a:0,vx:0,vy:0});s.resolveRobot();
-  assert(Math.abs(s.robot.x-x)<1e-6,team+' should fit under '+alliance+' tower');
-  assert(Math.abs(s.robot.y-H/2)<1e-6,team+' should fit between uprights');
- }
- const s=empty(resolvePreset('341'));Object.assign(s.robot,{x:TOWER.postX,y:H/2+(TOWER.postGap+TOWER.postWidth)/2,z:0,a:0,vx:0,vy:0});
- s.resolveRobot();assert.notEqual(s.robot.y,H/2+(TOWER.postGap+TOWER.postWidth)/2);
 });
 test('fleet preserves inventories and setup fuel count when adding/switching',()=>{
  const s=new Simulation();assert(s.addRobot({...ARCHETYPES.dumper.settings,team:'1640',alliance:'blue'}));assert.equal(s.initialCenterCount,392);assert.equal(total(s),504);

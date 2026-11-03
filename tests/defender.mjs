@@ -75,7 +75,7 @@ const earlyInput=defenderInput(early,'medium');assert(!earlyInput.shoot&&earlyIn
 early.time=50;const scoreInput=defenderInput(early,'medium');assert(scoreInput.shoot||scoreInput.intake,'bot still scores with more than 5 seconds left');
 const escaping=makeSim();escaping.time=40;escaping.autoWinner='red';Object.assign(escaping.fleet[1].robot,{x:8,y:4,vx:0,vy:0});Object.assign(escaping.fleet[0].robot,{x:7,y:4,vx:0,vy:0});escaping.pinCounts=[{attacker:1,victim:0,alliance:'red',elapsed:2.2}];
 assert(defenderInput(escaping,'medium').moveX>0,'bot backs away before a pin foul');
-const bump=makeSim();bump.time=40;bump.autoWinner='red';bump.fleet[0].config=resolve('8513');Object.assign(bump.fleet[0].robot,{x:5,y:2.51,vx:0,vy:0});Object.assign(bump.fleet[1].robot,{x:8,y:2.51,vx:0,vy:0});
+const bump=makeSim();bump.balls=[];bump.time=40;bump.autoWinner='red';bump.fleet[0].config=resolve('8513');Object.assign(bump.fleet[0].robot,{x:5,y:2.51,vx:0,vy:0});Object.assign(bump.fleet[1].robot,{x:8,y:2.51,vx:0,vy:0});
 const bumpInput=defenderInput(bump,'medium');assert(bumpInput.moveX<0&&Math.abs(bumpInput.moveY)<.05,'bot blocks the opponent bump lane');
 console.log('AI handles early defense, pin release and bump-only opponents');
 const jam=makeSim();jam.time=40;jam.autoWinner='red';jam.balls=[];
@@ -151,3 +151,16 @@ Object.assign(movingApproach.fleet[1].robot,{x:13.8,y:1.4,a:1.3,vx:0,vy:0});movi
 movingApproach.balls=[{...require('../dist/physics.js').ball(9,2.5),sleeping:true}];
 const movingInput=defenderInput(movingApproach,'hard');assert(Math.hypot(movingInput.moveX||0,movingInput.moveY||0)>.8,'hard AI keeps moving while approaching crossing');
 console.log('Hard scoring AI maintains speed while approaching crossings');
+// The same bump-only opponent is guarded at the bump with scarce fuel, but
+// pressured in its alliance zone when there is enough nearby fuel to score.
+for(const alliance of ['blue','red']){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('8513',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;
+ const px=alliance==='blue'?3:16.54-3,bx=alliance==='blue'?5.577:16.54-5.577;
+ Object.assign(s.fleet[0].robot,{x:px,y:2.51,a:0,vx:0,vy:0});Object.assign(s.fleet[1].robot,{x:bx,y:2.51,a:0,vx:0,vy:0});s.balls=[];
+ const guard=defenderInput(s,'hard');
+ s.balls=Array.from({length:24},(_,i)=>({x:px,y:1+i*.06,z:.075}));s.time+=.6;
+ const zone=defenderInput(s,'hard');
+ assert(Math.abs(zone.moveX||0)>.5&&Math.abs(guard.moveX||0)<.1,`${alliance} AI should cross toward player in fuel-rich zone`);
+ s.balls=[];s.time+=.6;const guardAgain=defenderInput(s,'hard');assert(Math.abs(guardAgain.moveX||0)<.1,`${alliance} AI should return to bump when fuel runs low`);
+}
+console.log('AI switches between bump and zonal defense based on opponent-zone fuel');
