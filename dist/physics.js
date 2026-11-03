@@ -22,7 +22,10 @@
     y:sign<0?FIELD.trenchWidth/2:H-FIELD.trenchWidth/2,
     width:FIELD.hubSize,depth:FIELD.trenchWidth,alliance:h.alliance,sign})));
   const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65,hub:true,alliance:h.alliance}));
-  for (const t of trenches) solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:FIELD.dividerHeight});
+  for (const t of trenches) {
+    solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:FIELD.dividerHeight});
+    solids.push({x:t.x,y:t.y,width:.16,depth:FIELD.trenchWidth,bottom:FIELD.trenchClearance,height:FIELD.trenchClearance+.12,trenchBeam:true});
+  }
   const TOWER={depth:1.3004,width:.83,postX:1.1024,postGap:.73,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[1.05,1.35,1.6002]};
   const towers=['blue','red'].map(alliance=>({alliance,x:alliance==='blue'?TOWER.postX:W-TOWER.postX,y:H/2}));
   for(const t of towers){
@@ -290,7 +293,6 @@
         ey=Math.abs(Math.sin(r.a))*c.length/2+Math.abs(Math.cos(r.a))*c.width/2;
       r.x=clamp(r.x,ex,W-ex);r.y=clamp(r.y,ey,H-ey);
       const obstacles=[...solids,...(this.multiplayer?[]:this.parked.map(p=>({x:p.robot.x,y:p.robot.y,width:p.config.length,depth:p.config.width,a:p.robot.a})))];
-      if(clearanceHeight(c,this.inventory)+r.z>FIELD.trenchClearance)for(const t of trenches)obstacles.push({...t,height:1.022});
       for(let i=0;i<3;i++)for(const b of obstacles){if(b.height!==undefined&&(r.z>=b.height||r.z+clearanceHeight(c,this.inventory)<=(b.bottom||0)))continue;
         const reach=Math.hypot(c.length,c.width)/2+Math.hypot(b.width,b.depth)/2;
         if(Math.abs(r.x-b.x)>reach||Math.abs(r.y-b.y)>reach)continue;
@@ -305,7 +307,7 @@
         // Approximate equal chassis weight plus the actual carried fuel. A small
         // restitution models padded bumpers; tangential friction makes sustained
         // contact resist sliding past a defender.
-        const invA=1/(c.mass||54+(this.inventory||0)*.2268),invB=1/(oc.mass||54+(other.inventory||0)*.2268),sum=invA+invB;
+        const invA=1/((c.mass||54+(this.inventory||0)*.2268)*(r.defensePush||1)),invB=1/((oc.mass||54+(other.inventory||0)*.2268)*(o.defensePush||1)),sum=invA+invB;
         const {nx,ny,depth}=hit,move=depth+.00001;
         r.x+=nx*move*invA/sum;r.y+=ny*move*invA/sum;o.x-=nx*move*invB/sum;o.y-=ny*move*invB/sum;
         // The middle of the overlapping bumper interval approximates the contact
@@ -583,9 +585,6 @@
         if(b.x<BR||b.x>W-BR){b.x=clamp(b.x,BR,W-BR);b.vx*=-.55;}
         if(b.y<BR||b.y>H-BR){b.y=clamp(b.y,BR,H-BR);b.vy*=-.55;}
         for(const box of solids)if(!(box.hub&&box.alliance===b.hubInside))this.collideBallBox(b,box);
-        // Trench overhangs block airborne fuel and tall chassis; the low lane stays open.
-        for(const tr of trenches)if(b.z>FIELD.trenchClearance&&b.z<.69&&Math.abs(b.x-tr.x)<tr.width/2&&Math.abs(b.y-tr.y)<tr.depth/2){
-          b.z=b.vz>0?FIELD.trenchClearance-BR:.69+BR;b.vz*=-.35;}
         let collected=false;
         if(this.multiplayer){
           for(let n=0;n<this.fleet.length;n++){
