@@ -128,3 +128,11 @@ Object.assign(pursuit.fleet[0].robot,{x:3,y:2.51,a:0,vx:0,vy:0});Object.assign(p
 let pressure=0;for(let i=0;i<8*120;i++){pursuit.fleet[0].inventory=pursuit.fleet[0].state.inventory=50;pursuit.step(1/120,[{shoot:true},defenderInput(pursuit,'hard')]);if(Math.hypot(pursuit.fleet[0].robot.x-pursuit.fleet[1].robot.x,pursuit.fleet[0].robot.y-pursuit.fleet[1].robot.y)<1.4)pressure++;}
 assert(pressure>4*120,`hard defense should reach and pressure the shooter, got ${pressure/120}s`);
 console.log('Hard AI crosses while turning and pursues through the hub');
+// Hard bump defense tracks lateral motion and stops guarding the bump after
+// the attacker crosses; medium retains its fixed-lane behavior.
+const agile=new Simulation({},()=>.5);agile.enableMultiplayer([resolve('8513','blue'),resolve('316','red')]);agile.start();agile.time=40;agile.autoWinner='red';agile.balls=[];
+Object.assign(agile.fleet[0].robot,{x:3.5,y:2.1,a:0,vx:0,vy:1});Object.assign(agile.fleet[1].robot,{x:5.58,y:2.3,a:Math.PI,vx:0,vy:0});
+const tracking=defenderInput(agile,'hard');assert(tracking.moveY>.7,'hard bump defense predicts and rapidly tracks lateral movement');
+Object.assign(agile.fleet[0].robot,{x:5.4,y:2.51,vx:1,vy:0});Object.assign(agile.fleet[1].robot,{x:7,y:2.51});
+const afterCross=defenderInput(agile,'hard');assert(afterCross.moveX<-.8,'hard defense chases once attacker has crossed the bump');
+console.log('Hard bump defense tracks and responds after a crossing');
