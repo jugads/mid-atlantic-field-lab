@@ -144,3 +144,10 @@ const moved=Math.hypot(controlledContact.fleet[0].robot.x-7,controlledContact.fl
 assert(moved<2,`stationary player should not be pushed across the field: ${moved}m`);
 assert(contactSpin>.3,'controlled defense still creates an off-center turning impact');
 console.log('Hard defense controls sustained pushing while disrupting aim');
+// On the approach, hard mode should move and turn together rather than
+// waiting for the intake or crossing heading before driving.
+const movingApproach=new Simulation({},()=>.5);movingApproach.enableMultiplayer([resolve('341'),resolve('316','red')]);movingApproach.start();movingApproach.time=33;movingApproach.autoWinner='blue';
+Object.assign(movingApproach.fleet[1].robot,{x:13.8,y:1.4,a:1.3,vx:0,vy:0});movingApproach.fleet[1].inventory=movingApproach.fleet[1].state.inventory=0;
+movingApproach.balls=[{...require('../dist/physics.js').ball(9,2.5),sleeping:true}];
+const movingInput=defenderInput(movingApproach,'hard');assert(Math.hypot(movingInput.moveX||0,movingInput.moveY||0)>.8,'hard AI keeps moving while approaching crossing');
+console.log('Hard scoring AI maintains speed while approaching crossings');
