@@ -226,3 +226,8 @@ console.log('Hard defense anticipates a same-lane return from neutral');
   Object.assign(s.fleet[1].robot,{x:14,y:2});Object.assign(s.fleet[0].robot,{x:2,y:6});s.balls=[{x:14.5,y:2.5,z:0}];
   const controls=defenderInput(s,'medium',1,0);assert(controls.shoot&&Math.hypot(controls.moveX||0,controls.moveY||0)>0,'turret should shoot while moving to collect');
 }
+{
+ const s=new Simulation();s.enableMultiplayer([resolve('316','blue'),resolve('9094','red')]);s.start();s.time=40;s.autoWinner='red';s.fleet[1].inventory=10;
+ Object.assign(s.fleet[1].robot,{x:8,y:2});Object.assign(s.fleet[0].robot,{x:3,y:4});
+ assert.equal(defenderInput(s,'hard',1,0).shoot,true,'defending turret passes while outside home zone');
+}

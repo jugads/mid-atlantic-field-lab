@@ -1,5 +1,8 @@
 const {randomBytes,randomInt}=require('node:crypto');
 const {profiles}=require('../dist/team-presets.js');
+const isFullMatch=mode=>mode==='3v3'||mode==='3v3coop';
+const aiSlots=(mode,index)=>mode==='3v3'?2:mode==='3v3coop'&&index===0?1:0;
+const teamPool=Object.keys(profiles);
 const cleanInput=value=>{
   const input={};if(!value||typeof value!=='object')return input;
   for(const k of ['moveX','moveY','forward','tankTurn','turnAxis'])input[k]=Number.isFinite(value[k])?Math.max(-1,Math.min(1,value[k])):0;
@@ -11,7 +14,7 @@ class Rooms{
   send(socket,data){if(socket?.readyState===1&&socket.bufferedAmount<512000)socket.send(JSON.stringify(data));}
   fail(socket,message){this.send(socket,{type:'error',message});}
   lobby(room){return {type:'room',protocol:2,code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,hostId:room.hostId,stalled:!!room.stalled,
-    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,aiTeams:p.aiTeams,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
+    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,aiTeams:p.aiTeams,aiRoles:p.aiRoles,ready:p.ready,connected:!!p.socket,alliance:['coop','3v3coop'].includes(room.mode)||index===0?'blue':'red'}))};}
   broadcast(room,message=this.lobby(room)){for(const p of room.players)this.send(p.socket,message);}
   welcome(room,p){this.send(p.socket,{type:'welcome',protocol:2,id:p.id,token:p.token,code:room.code});this.broadcast(room);if(room.snapshot&&p.id!==room.hostId)this.send(p.socket,room.snapshot);}
   handle(socket,msg){
@@ -28,7 +31,7 @@ class Rooms{
       if(socket.room)return this.fail(socket,'Leave your current room first.');
       let room;
       if(msg.type==='create'){
-        if(!['1v1','2v2','3v3','coop'].includes(msg.mode))return this.fail(socket,'Choose 1v1, 2v2, 3v3, or co-op.');
+        if(!['1v1','2v2','3v3','3v3coop','coop'].includes(msg.mode))return this.fail(socket,'Choose 1v1, 2v2, 3v3, or co-op.');
         if(this.rooms.size>=this.maxRooms)return this.fail(socket,'Server is full. Try again after a match finishes.');
         const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code;
         do{code=Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');}while(this.rooms.has(code));
@@ -39,7 +42,10 @@ class Rooms{
         if(room.players.length>=2)return this.fail(socket,'This room already has two players.');
         if(room.status!=='lobby')return this.fail(socket,'This match has already started.');
       }
-      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team:typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341',aiTeams:['2539','2539'],ready:false,socket};
+      const used=new Set(room.players.flatMap(driver=>[driver.team,...driver.aiTeams.slice(0,aiSlots(room.mode,room.players.indexOf(driver)))]));
+      let team=typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341';if(used.has(team))team=teamPool.find(id=>!used.has(id));used.add(team);
+      const picks=[];for(let i=0;i<aiSlots(room.mode,room.players.length);i++){const choice=teamPool.find(id=>!used.has(id));picks.push(choice);used.add(choice);}
+      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team,aiTeams:picks,aiRoles:picks.map(()=>'auto'),ready:false,socket};
       room.players.push(p);if(!room.hostId)room.hostId=p.id;socket.room=room;socket.player=p;this.welcome(room,p);return;
     }
     const room=socket.room,p=socket.player;if(!room||!p)return this.fail(socket,'Join a room first.');
@@ -51,7 +57,7 @@ class Rooms{
     }
     if(msg.type==='snapshot'){
       if(p.id!==room.hostId||!['playing','paused','countdown'].includes(room.status))return;
-      if(!Number.isFinite(msg.time)||msg.time<0||msg.time>166||!Array.isArray(msg.balls)||msg.balls.length>504||!Array.isArray(msg.fleet)||msg.fleet.length!==(room.mode==='3v3'?6:room.mode==='2v2'?4:2)||!msg.scores)return;
+      if(!Number.isFinite(msg.time)||msg.time<0||msg.time>166||!Array.isArray(msg.balls)||msg.balls.length>504||!Array.isArray(msg.fleet)||msg.fleet.length!==(isFullMatch(room.mode)?6:room.mode==='2v2'?4:2)||!msg.scores)return;
       if(room.snapshot&&msg.time+0.001<room.snapshot.time)return;
       msg.status=room.status;room.snapshot=msg;room.snapshotAt=this.now();
       for(const other of room.players)if(other.id!==room.hostId)this.send(other.socket,msg);
@@ -61,12 +67,18 @@ class Rooms{
     if(msg.type==='select'){
       if(room.status!=='lobby')return this.fail(socket,'Robot selection is locked during a match.');
       if(!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Unknown robot.');
+      if(room.players.some(other=>(other!==p&&other.team===msg.team)||other.aiTeams.includes(msg.team)))return this.fail(socket,'That team is already in this match.');
       p.team=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='select_ai'){
-      if(room.status!=='lobby'||room.mode!=='3v3')return this.fail(socket,'AI selection is available in a 3v3 lobby.');
-      if(!Number.isInteger(msg.slot)||msg.slot<0||msg.slot>1||typeof msg.team!=='string'||!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Invalid AI selection.');
+      if(room.status!=='lobby'||!isFullMatch(room.mode))return this.fail(socket,'AI selection is available in a 3v3 lobby.');
+      if(!Number.isInteger(msg.slot)||msg.slot<0||msg.slot>=aiSlots(room.mode,room.players.indexOf(p))||typeof msg.team!=='string'||!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Invalid AI selection.');
+      if(room.players.some(other=>other.team===msg.team||other.aiTeams.some((id,i)=>id===msg.team&&(other!==p||i!==msg.slot))))return this.fail(socket,'That team is already in this match.');
       p.aiTeams[msg.slot]=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
+    }
+    if(msg.type==='select_ai_role'){
+      if(room.status!=='lobby'||!isFullMatch(room.mode)||!Number.isInteger(msg.slot)||msg.slot<0||msg.slot>=aiSlots(room.mode,room.players.indexOf(p))||!['auto','score','defend','collect','pass'].includes(msg.role))return this.fail(socket,'Invalid AI role.');
+      p.aiRoles[msg.slot]=msg.role;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='ready'){
       if(room.status!=='lobby')return;

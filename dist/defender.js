@@ -2,7 +2,7 @@
 export const defenderTeam = () => '316';
 const scoringState = new WeakMap();
 const defenseState = new WeakMap();
-function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
+function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0, role = 'auto') {
   const defender = sim.fleet[botIndex], player = sim.fleet[opponentIndex].robot, r = defender.robot;
   const hard = difficulty === 'hard', easy = difficulty === 'easy';
   const defenseSpeed = 1;
@@ -17,7 +17,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
   };
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
-  const scoring = sim.phase.id === 'auto' || (sim.activeAt(defender.config.alliance) && !leavingEarly);
+  const scoring = sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
   // A small defensive traction advantage affects contact, not top speed.
   r.defensePush = !scoring && hard ? 1.06 : 1;
   if (scoring) {
@@ -34,7 +34,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     }
     if (defender.inventory === 0 && !state.collecting) { state.collecting = true; state.since = sim.time; state.target = null; }
     // Batch sizable loads and leave time to return before switching to defense.
-    if (state.collecting && (defender.inventory >= (hard ? Math.min(defender.config.capacity, 30) : defender.config.capacity) || (defender.inventory > 0 && Number.isFinite(sim.phaseRemaining) && sim.phaseRemaining <= (hard && sim.phase.shift ? 9 : 4)))) { state.collecting = false; state.target = null; state.lane = null; }
+    if (state.collecting && (defender.inventory >= (hard ? (role === 'collect' ? defender.config.capacity : Math.min(defender.config.capacity, 30)) : defender.config.capacity) || (defender.inventory > 0 && Number.isFinite(sim.phaseRemaining) && sim.phaseRemaining <= (hard && sim.phase.shift ? 9 : 4)))) { state.collecting = false; state.target = null; state.lane = null; }
     // Cross the entire structure before re-planning. Crossing the alliance-line
     // alone does not mean the back of the chassis has cleared the divider.
     const crossTrench = (towardHome) => {
@@ -337,11 +337,14 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
 // Swiveling shooters can score while following their normal collection or
 // evasion route. Only fire inside their scoring zone and effective range.
 export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
-  const input = planDefenderInput(sim, difficulty, botIndex, opponentIndex);
+  const role = sim.fleet[botIndex].config.aiRole || 'auto';
+  const input = planDefenderInput(sim, difficulty, botIndex, opponentIndex, role);
   const bot = sim.fleet[botIndex], c = bot.config, r = bot.robot;
   const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
   const home = c.alliance === 'red' ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const hubX = c.alliance === 'red' ? 16.54 - 4.627 : 4.627;
-  if (active && home && bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange) input.shoot = true;
+  if (!active && home && ['collect','pass'].includes(role)) input.shoot = false;
+  else if (role === 'pass' && bot.inventory > 0 && !home) input.shoot = true;
+  else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
   return input;
 }

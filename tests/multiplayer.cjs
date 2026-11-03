@@ -122,10 +122,14 @@ test('3v3 room accepts exactly six robot snapshots',()=>{
  rooms.handle(a,{type:'snapshot',time:1,fleet:Array.from({length:6},()=>({})),balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot.fleet.length,6);assert.equal(b.messages.at(-1).fleet.length,6);
  rooms.handle(a,{type:'snapshot',time:2,fleet:[{},{}],balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot.time,1);
 });
-test('each 3v3 player controls only their own AI teams and changes clear readiness',()=>{
-  const rooms=new Rooms({now:()=>1000}),a=socket(),b=socket();rooms.handle(a,{type:'create',protocol:2,mode:'3v3',team:'341'});rooms.handle(b,{type:'join',protocol:2,code:a.room.code,team:'708'});
-  rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'select_ai',slot:1,team:'316'});
-  assert.deepEqual(a.player.aiTeams,['2539','2539']);assert.deepEqual(b.player.aiTeams,['2539','316']);assert.equal(a.player.ready,false);
-  rooms.handle(b,{type:'select_ai',slot:0,team:'bogus'});assert.equal(b.player.aiTeams[0],'2539');
-  const lobby=rooms.lobby(a.room);assert.deepEqual(lobby.players[1].aiTeams,['2539','316']);
+test('3v3 enforces unique teams and preserves independent AI roles',()=>{
+ const rooms=new Rooms({now:()=>1000}),a=socket(),b=socket();rooms.handle(a,{type:'create',protocol:2,mode:'3v3',team:'341'});rooms.handle(b,{type:'join',protocol:2,code:a.room.code,team:'341'});
+ const players=a.room.players;assert.equal(new Set(players.flatMap(p=>[p.team,...p.aiTeams])).size,6);
+ const before=b.player.aiTeams[0];rooms.handle(b,{type:'select_ai',slot:0,team:a.player.team});assert.equal(b.player.aiTeams[0],before);
+ rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'select_ai_role',slot:0,role:'defend'});assert.equal(b.player.aiRoles[0],'defend');assert.equal(a.player.ready,false);
+});
+test('3v3 co-op assigns both players blue and accepts six robots',()=>{
+ let now=1000;const rooms=new Rooms({now:()=>now}),a=socket(),b=socket();rooms.handle(a,{type:'create',protocol:2,mode:'3v3coop',team:'341'});rooms.handle(b,{type:'join',protocol:2,code:a.room.code,team:'316'});const room=a.room;
+ assert.deepEqual(rooms.lobby(room).players.map(p=>p.alliance),['blue','blue']);rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});now=4001;rooms.tick();
+ rooms.handle(a,{type:'snapshot',time:1,fleet:Array.from({length:6},()=>({})),balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot.fleet.length,6);
 });

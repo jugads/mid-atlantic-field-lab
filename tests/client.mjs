@@ -52,3 +52,6 @@ const configured = createHostSimulation({mode:'3v3',players:[{team:'341',allianc
 assert.deepEqual(configured.fleet.map(e=>e.config.team),['341','5895','316','708','1391','9094']);
 const configuredSolo = createHostSimulation({mode:'3v3solo',players:[{team:'341',alliance:'blue'}],aiTeams:{blue:['316','708'],red:['1391','9094','5895']}});
 assert.deepEqual(configuredSolo.fleet.map(e=>e.config.team),['341','316','708','1391','9094','5895']);
+
+const coop3 = createHostSimulation({mode:'3v3coop',players:[{team:'341',alliance:'blue',aiTeams:['708'],aiRoles:['defend']},{team:'316',alliance:'blue',aiTeams:[]}]});
+assert.deepEqual(coop3.fleet.map(e=>e.config.alliance),['blue','blue','blue','red','red','red']);assert.equal(new Set(coop3.fleet.map(e=>e.config.team)).size,6);assert.equal(coop3.fleet[2].config.aiRole,'defend');

@@ -1,12 +1,19 @@
-import {defenderInput} from './defender.js?v=turret16';
+import {defenderInput} from './defender.js?v=strategy17';
 
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
   const roster=room.players.map(p=>resolve(p.team,p.alliance));
-  const size=room.mode==='3v3'||room.mode==='3v3solo'?3:room.mode==='2v2'?2:0;
+  const size=room.mode==='3v3'||room.mode==='3v3solo'||room.mode==='3v3coop'?3:room.mode==='2v2'?2:0;
+  const used=new Set(roster.map(c=>c.team)),pool=Object.keys(globalThis.TeamPresets.profiles);
   if(size)for(const alliance of ['blue','red']){
     const count=roster.filter(r=>r.alliance===alliance).length;
-    for(let i=count;i<size;i++){const owner=room.players.find(p=>p.alliance===alliance),chosen=room.aiTeams?.[alliance]?.[i-count]??owner?.aiTeams?.[i-count]??'2539'; roster.push(resolve(chosen,alliance));}
+    for(let i=count;i<size;i++){
+      const owner=room.players.find(p=>p.alliance===alliance),slot=i-count;
+      const proposed=room.aiTeams?.[alliance]?.[slot]??owner?.aiTeams?.[slot];
+      const candidate=proposed||'2539',chosen=!used.has(candidate)?candidate:pool.find(id=>!used.has(id));used.add(chosen);
+      const role=room.aiRoles?.[alliance]?.[slot]??owner?.aiRoles?.[slot]??'auto';
+      roster.push({...resolve(chosen,alliance),aiRole:role});
+    }
   }
   const sim=new Simulation();sim.enableMultiplayer(roster);return sim;
 }
@@ -105,7 +112,7 @@ export class MultiplayerClient{
     const round=n=>Math.round(n*1000)/1000;
     const balls=s.balls.map(b=>{if(!this.ballIds.has(b))this.ballIds.set(b,this.nextBallId++);return [this.ballIds.get(b),round(b.x),round(b.y),round(b.z)];});
     const snapshot={type:'snapshot',status:this.room.status,countdown:this.room.countdown||0,time:s.time,started:s.started,running:s.running,
-      scores:{...s.scores},fouls:s.fouls,foulPoints:s.foulPoints,foulEvents:s.foulEvents,pinCounts:s.pinCounts,autoScores:{...s.autoScores},autoWinner:s.autoWinner,tieChoice:s.tieChoice,fired:s.fired,passed:s.passed,resolved:s.resolved,made:s.made,recycled:s.recycled,initialCenterCount:s.initialCenterCount,
+      scores:{...s.scores},matchStats:s.matchStats,fouls:s.fouls,foulPoints:s.foulPoints,foulEvents:s.foulEvents,pinCounts:s.pinCounts,autoScores:{...s.autoScores},autoWinner:s.autoWinner,tieChoice:s.tieChoice,fired:s.fired,passed:s.passed,resolved:s.resolved,made:s.made,recycled:s.recycled,initialCenterCount:s.initialCenterCount,
       fleet:s.fleet.map(e=>({config:e.config,robot:{...e.robot},inventory:e.inventory,turretAngle:e.state.turretAngle,intake:e.state.intake})),balls};
     this.send(snapshot);this.frames.push({at:now,data:snapshot});if(this.frames.length>6)this.frames.shift();
   }
@@ -119,7 +126,7 @@ export class MultiplayerClient{
     const f=a===b?1:Math.max(0,Math.min(1,(renderAt-a.at)/(b.at-a.at))),data=b.data;
     const lerp=(x,y)=>x+(y-x)*f;
     const angle=(x,y)=>x+Math.atan2(Math.sin(y-x),Math.cos(y-x))*f;
-    for(const k of ['started','running','scores','fouls','foulPoints','foulEvents','pinCounts','autoScores','autoWinner','tieChoice','fired','passed','resolved','made','recycled','initialCenterCount'])sim[k]=data[k];
+    for(const k of ['started','running','scores','matchStats','fouls','foulPoints','foulEvents','pinCounts','autoScores','autoWinner','tieChoice','fired','passed','resolved','made','recycled','initialCenterCount'])sim[k]=data[k];
     sim.time=lerp(a.data.time,data.time);
     sim.fleet=data.fleet.map((e,i)=>{
       const old=a.data.fleet[i]||e,robot={...e.robot};
