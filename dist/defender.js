@@ -210,7 +210,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   // Meet an approaching bump-only robot instead of waiting at the guard point.
   // Work from either side, and ease the drive command once bumpers meet.
   const approaching = (player.vx || 0) * dx > .12;
-  const nearBump = Math.abs(player.x - hubX) < 2.0 && Math.abs(r.x - hubX) < 2.0;
+  const nearBump = Math.abs(player.x - hubX) < (hard ? 4 : 2) && Math.abs(r.x - hubX) < (hard ? 2.7 : 2);
   if (!nearBump || distance > 2.4) ds.bumpAnchor = null;
   // Travel around the near end of the hub before changing bump lanes. Driving
   // straight sideways at the hub face would leave the defender stuck there.
@@ -223,11 +223,11 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
     if (ds.laneShift) {
       const path = ds.laneShift; path.lane = lane;
       if ((r.y - 8.07 / 2) * (lane - 8.07 / 2) > 0 && Math.abs(r.y - lane) < .5) ds.laneShift = null;
-      else if (Math.abs(r.x - path.x) > .2) return driveTo(path.x, r.y, false, 1);
+      else if (Math.abs(r.x - path.x) > .2) return driveTo(path.x, path.lane, false, 1);
       else return driveTo(path.x, lane, false, 1);
     }
   } else if (!bumpOnly) ds.laneShift = null;
-  if (bumpOnly && nearBump && distance < (hard ? 3.5 : 2.2) && Math.abs(dy) < 1.1 && (approaching || (hard && ds.bumpEngagedUntil > sim.time))) {
+  if (bumpOnly && nearBump && distance < (hard ? 4.5 : 2.2) && Math.abs(dy) < 1.1 && (approaching || (hard && ds.bumpEngagedUntil > sim.time))) {
     if (hard && approaching) ds.bumpEngagedUntil = sim.time + 1.5;
     // Hard mode holds bumper pressure through contact instead of yielding as
     // soon as the opposing robot slows; use bounded displacement and the pin
