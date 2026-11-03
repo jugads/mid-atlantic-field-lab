@@ -43,3 +43,12 @@ const botDefense=defenderInput(dual,'medium',2,3);assert(botDefense.moveX>0,'blu
 const sameSim=makeSim();sameSim.enableMultiplayer([resolve('341'),resolve('316','red'),{...resolve('2539','blue'),intakeDirection:'front'},{...resolve('2539','red'),intakeDirection:'front'}]);sameSim.start();sameSim.fleet[2].inventory=sameSim.fleet[2].state.inventory=0;
 defenderInput(sameSim,'medium',2,3);assert(defenderInput(sameSim,'medium',3,2).shoot,'each bot has independent scoring state');
 console.log('Both bots target each other and use separate strategy state');
+const fill=makeSim();fill.time=40;fill.autoWinner='blue';const fillBot=fill.fleet[1];Object.assign(fillBot.robot,{x:13,y:3,a:0});fillBot.inventory=fillBot.state.inventory=0;fill.balls=[{x:14,y:3,z:.075}];
+defenderInput(fill,'medium');fill.time=47;fillBot.robot.x=13.4;fillBot.inventory=fillBot.state.inventory=11;
+assert(!defenderInput(fill,'medium').shoot,'AI keeps collecting past the old 10-ball cutoff');
+fillBot.inventory=fillBot.state.inventory=fillBot.config.capacity;assert.equal(defenderInput(fill,'medium').shoot,true,'full AI hopper is shot');
+const late=makeSim();late.time=55;late.autoWinner='blue';const lateBot=late.fleet[1];lateBot.inventory=lateBot.state.inventory=0;late.balls=[{x:14,y:3,z:.075}];defenderInput(late,'medium');lateBot.inventory=lateBot.state.inventory=4;assert.equal(defenderInput(late,'medium').shoot,true,'AI shoots a partial hopper when its shift is nearly over');
+const clusters=makeSim();clusters.time=40;clusters.autoWinner='blue';const cb=clusters.fleet[1];Object.assign(cb.robot,{x:13,y:3,a:0});cb.inventory=cb.state.inventory=0;
+clusters.balls=[{x:13.6,y:2.5,z:.075},...Array.from({length:12},(_,i)=>({x:14.7+(i%4)*.15,y:4.5+Math.floor(i/4)*.15,z:.075}))];
+assert(defenderInput(clusters,'medium').turnAxis>0,'AI favors a larger fuel cluster over a nearby single ball');
+console.log('AI fills capacity and prioritizes fuel clusters');
