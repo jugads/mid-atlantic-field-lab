@@ -88,7 +88,7 @@
         const position=candidates.find(p=>used.every(o=>Math.abs(p.y-o.y)>=(c.width+o.width)/2+.05))||candidates[0];
         used.push({y:position.y,width:c.width});
         const robot={x:blue?FIELD.startLine-c.length/2:W-FIELD.startLine+c.length/2,
-          y:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,z:0,pitch:0,roll:0};
+          y:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
         return {config:c,robot,inventory:Math.min(8,c.capacity)};
       });
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
@@ -240,12 +240,27 @@
         const invA=1/(c.mass||54+(this.inventory||0)*.2268),invB=1/(oc.mass||54+(other.inventory||0)*.2268),sum=invA+invB;
         const {nx,ny,depth}=hit,move=depth+.00001;
         r.x+=nx*move*invA/sum;r.y+=ny*move*invA/sum;o.x-=nx*move*invB/sum;o.y-=ny*move*invB/sum;
-        const rvx=r.vx-o.vx,rvy=r.vy-o.vy,normal=rvx*nx+rvy*ny;
+        // The middle of the overlapping bumper interval approximates the contact
+        // patch. Off-center impulses create torque using a rectangular inertia.
+        const tx=-ny,ty=nx,extent=(robot,c,x,y)=>Math.abs(x*Math.cos(robot.a)+y*Math.sin(robot.a))*c.length/2+Math.abs(-x*Math.sin(robot.a)+y*Math.cos(robot.a))*c.width/2;
+        const at=r.x*tx+r.y*ty,bt=o.x*tx+o.y*ty,ae=extent(r,c,tx,ty),be=extent(o,oc,tx,ty);
+        const tangentPoint=(Math.max(at-ae,bt-be)+Math.min(at+ae,bt+be))/2;
+        const normalPoint=((r.x*nx+r.y*ny-extent(r,c,nx,ny))+(o.x*nx+o.y*ny+extent(o,oc,nx,ny)))/2;
+        const px=nx*normalPoint+tx*tangentPoint,py=ny*normalPoint+ty*tangentPoint;
+        const ax=px-r.x,ay=py-r.y,bx=px-o.x,by=py-o.y;
+        const invIA=12*invA/(c.length*c.length+c.width*c.width),invIB=12*invB/(oc.length*oc.length+oc.width*oc.width);
+        const wa=r.omega||0,wb=o.omega||0,rvx=r.vx-wa*ay-o.vx+wb*by,rvy=r.vy+wa*ax-o.vy-wb*bx;
+        const cross=(x,y,u,v)=>x*v-y*u,raN=cross(ax,ay,nx,ny),rbN=cross(bx,by,nx,ny);
+        const normal=rvx*nx+rvy*ny;
         if(normal<0){
-          const impulse=-(1+.05)*normal/sum,tx=-ny,ty=nx,tangent=rvx*tx+rvy*ty;
-          const friction=clamp(-tangent/sum,-impulse*.8,impulse*.8);
+          const impulse=-(1+.05)*normal/(sum+raN*raN*invIA+rbN*rbN*invIB);
+          const raT=cross(ax,ay,tx,ty),rbT=cross(bx,by,tx,ty),tangent=rvx*tx+rvy*ty;
+          const friction=clamp(-tangent/(sum+raT*raT*invIA+rbT*rbT*invIB),-impulse*.8,impulse*.8);
           const ix=impulse*nx+friction*tx,iy=impulse*ny+friction*ty;
           r.vx+=ix*invA;r.vy+=iy*invA;o.vx-=ix*invB;o.vy-=iy*invB;
+          const spinA=cross(ax,ay,ix,iy)*invIA,spinB=-cross(bx,by,ix,iy)*invIB;
+          r.impactOmega=clamp((r.impactOmega||0)+spinA,-8,8);o.impactOmega=clamp((o.impactOmega||0)+spinB,-8,8);
+          r.omega+=spinA;o.omega+=spinB;
         }
       }
     }
@@ -321,7 +336,7 @@
         y=input.moveY??((input.down?1:0)-(input.up?1:0));
       let turn=clamp(((input.clockwise?1:0)-(input.counterclockwise?1:0))+(input.turnAxis||0),-1,1);
       if(c.drive==='tank'){turn=clamp(turn+(input.right?1:0)-(input.left?1:0)+(input.tankTurn||0),-1,1);const f=clamp(input.forward??((input.up?1:0)-(input.down?1:0)),-1,1);x=Math.cos(r.a)*f;y=Math.sin(r.a)*f;}
-      r.omega=turn*3.6;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
+      r.impactOmega=(r.impactOmega||0)*Math.exp(-3*dt);r.omega=turn*3.6+r.impactOmega;r.a+=r.omega*dt;const len=Math.hypot(x,y);if(len>1){x/=len;y/=len;}
       // Shooting and passing limit drive speed to 30% while fuel is available.
       r.shootingSpeedLimited=!!input.shoot&&this.inventory>0;
       const max=c.maxSpeed*(r.shootingSpeedLimited?.3:1);
@@ -440,7 +455,7 @@
       }else {this.turretAngle=r.a;this.resetAimPID(this.turretController);}
       if(wantsFire&&c.archetype==='dumper'&&c.autoAim&&!control.clockwise&&!control.counterclockwise&&Math.abs(control.turnAxis||0)<.01&&Math.abs(control.tankTurn||0)<.01){
         const error=Math.atan2(Math.sin(this.chassisAimAngle-r.a),Math.cos(this.chassisAimAngle-r.a));
-        const rotation=this.aimPID(this.aimController,error,dt)*dt;r.a+=rotation;r.omega=rotation/dt;this.resolveRobot();this.updatePose(dt);
+        const rotation=this.aimPID(this.aimController,error,dt)*dt;r.a+=rotation;r.omega=rotation/dt+(r.impactOmega||0);this.resolveRobot();this.updatePose(dt);
       }else this.resetAimPID(this.aimController);
       // The configured rate is the average total output across all lanes. Dumpers
       // emit individual balls with ±15% interval variation instead of synchronized volleys.
