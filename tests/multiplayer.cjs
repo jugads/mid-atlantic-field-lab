@@ -116,3 +116,9 @@ test('1v1 rooms reject four-robot snapshots',()=>{
  const {rooms,a,b,room,setNow}=lobby();rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});setNow(4001);rooms.tick();
  rooms.handle(a,{type:'snapshot',time:1,fleet:[{},{},{},{}],balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot,null);
 });
+test('3v3 room accepts exactly six robot snapshots',()=>{
+ let now=1000;const rooms=new Rooms({now:()=>now}),a=socket(),b=socket();rooms.handle(a,{type:'create',protocol:2,mode:'3v3',team:'341'});const room=a.room;
+ rooms.handle(b,{type:'join',protocol:2,code:room.code,team:'708'});rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});now=4001;rooms.tick();
+ rooms.handle(a,{type:'snapshot',time:1,fleet:Array.from({length:6},()=>({})),balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot.fleet.length,6);assert.equal(b.messages.at(-1).fleet.length,6);
+ rooms.handle(a,{type:'snapshot',time:2,fleet:[{},{}],balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot.time,1);
+});
