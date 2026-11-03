@@ -79,7 +79,7 @@ export class MultiplayerClient{
     if(playing&&this.hostLast){
       this.hostAccumulator+=Math.min(.1,Math.max(0,(now-this.hostLast)/1000));
       const guest=now-this.guestInputAt<300?this.guestInput:{};
-      while(this.hostAccumulator>=1/120){const inputs=[input,guest];if(this.room.mode==='2v2')inputs.push(defenderInput(s,'medium',2,3),defenderInput(s,'medium',3,2));s.step(1/120,inputs);this.hostAccumulator-=1/120;}
+      while(this.hostAccumulator>=1/120){const inputs=[input,guest];if(this.room.mode==='2v2')inputs.push(defenderInput(s,'medium',2,1),defenderInput(s,'medium',3,0));s.step(1/120,inputs);this.hostAccumulator-=1/120;}
     }
     this.hostLast=playing?now:0;
     if(now-this.lastSnapshot<50)return;
@@ -87,7 +87,7 @@ export class MultiplayerClient{
     const round=n=>Math.round(n*1000)/1000;
     const balls=s.balls.map(b=>{if(!this.ballIds.has(b))this.ballIds.set(b,this.nextBallId++);return [this.ballIds.get(b),round(b.x),round(b.y),round(b.z)];});
     const snapshot={type:'snapshot',status:this.room.status,countdown:this.room.countdown||0,time:s.time,started:s.started,running:s.running,
-      scores:{...s.scores},fouls:s.fouls,foulPoints:s.foulPoints,foulEvents:s.foulEvents,autoScores:{...s.autoScores},autoWinner:s.autoWinner,tieChoice:s.tieChoice,fired:s.fired,passed:s.passed,resolved:s.resolved,made:s.made,recycled:s.recycled,initialCenterCount:s.initialCenterCount,
+      scores:{...s.scores},fouls:s.fouls,foulPoints:s.foulPoints,foulEvents:s.foulEvents,pinCounts:s.pinCounts,autoScores:{...s.autoScores},autoWinner:s.autoWinner,tieChoice:s.tieChoice,fired:s.fired,passed:s.passed,resolved:s.resolved,made:s.made,recycled:s.recycled,initialCenterCount:s.initialCenterCount,
       fleet:s.fleet.map(e=>({config:e.config,robot:{...e.robot},inventory:e.inventory,turretAngle:e.state.turretAngle,intake:e.state.intake})),balls};
     this.send(snapshot);this.frames.push({at:now,data:snapshot});if(this.frames.length>6)this.frames.shift();
   }
@@ -101,7 +101,7 @@ export class MultiplayerClient{
     const f=a===b?1:Math.max(0,Math.min(1,(renderAt-a.at)/(b.at-a.at))),data=b.data;
     const lerp=(x,y)=>x+(y-x)*f;
     const angle=(x,y)=>x+Math.atan2(Math.sin(y-x),Math.cos(y-x))*f;
-    for(const k of ['started','running','scores','fouls','foulPoints','foulEvents','autoScores','autoWinner','tieChoice','fired','passed','resolved','made','recycled','initialCenterCount'])sim[k]=data[k];
+    for(const k of ['started','running','scores','fouls','foulPoints','foulEvents','pinCounts','autoScores','autoWinner','tieChoice','fired','passed','resolved','made','recycled','initialCenterCount'])sim[k]=data[k];
     sim.time=lerp(a.data.time,data.time);
     sim.fleet=data.fleet.map((e,i)=>{
       const old=a.data.fleet[i]||e,robot={...e.robot};

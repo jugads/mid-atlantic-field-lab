@@ -94,7 +94,7 @@
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
       const c=this.config;
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
-      this.fouls={blue:{minor:0,major:0},red:{minor:0,major:0}};this.foulPoints={blue:0,red:0};this.foulEvents=[];this.autoAcross=new Set();this.contactEpisodes=new Set();
+      this.fouls={blue:{minor:0,major:0},red:{minor:0,major:0}};this.foulPoints={blue:0,red:0};this.foulEvents=[];this.autoAcross=new Set();this.contactEpisodes=new Set();this.pinRecords=new Map();this.pinCounts=[];
       this.fired=0;this.passed=0;this.resolved=0;this.made=0;this.inactiveMade=0;this.recycled=0;this.time=0;
       this.nextTurret=0;this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
       this.aimController={integral:0,previousError:null,rate:0};this.turretController={integral:0,previousError:null,rate:0};this.turretAngle=this.robot.a;
@@ -169,6 +169,31 @@
         }
       }
       this.contactEpisodes=touching;
+    }
+    assessPins(dt,inputs){
+      if(!this.multiplayer||!this.controlsEnabled){this.pinRecords.clear();this.pinCounts=[];return;}
+      const seen=new Set(),drivers=this.fleet;
+      for(let i=0;i<drivers.length;i++)for(let j=0;j<drivers.length;j++){
+        if(i===j)continue;const attacker=drivers[i],victim=drivers[j],a=attacker.robot,v=victim.robot,ac=attacker.config,vc=victim.config;
+        if(ac.alliance===vc.alliance||a.z>=v.z+vc.height||v.z>=a.z+ac.height)continue;
+        const dx=v.x-a.x,dy=v.y-a.y,d=Math.hypot(dx,dy)||1,key=i+':'+j;
+        const touch=rectangleContact(a,ac.length+.12,ac.width+.12,{x:v.x,y:v.y,width:vc.length,depth:vc.width,a:v.a});
+        if(!touch)continue;
+        const ctrl=inputs[i]||{},mx=ctrl.moveX??((ctrl.right?1:0)-(ctrl.left?1:0)),my=ctrl.moveY??((ctrl.down?1:0)-(ctrl.up?1:0));
+        const vx=vc.length*Math.abs(Math.cos(v.a))/2+vc.width*Math.abs(Math.sin(v.a))/2,vy=vc.length*Math.abs(Math.sin(v.a))/2+vc.width*Math.abs(Math.cos(v.a))/2;
+        const edge=v.x-vx<.12||v.x+vx>W-.12||v.y-vy<.12||v.y+vy>H-.12;
+        const fixed=solids.some(o=>v.z<o.height&&v.z+vc.height>(o.bottom||0)&&rectangleContact(v,vc.length+.22,vc.width+.22,o));
+        const third=drivers.some((other,k)=>k!==i&&k!==j&&rectangleContact(v,vc.length+.16,vc.width+.16,{x:other.robot.x,y:other.robot.y,width:other.config.length,depth:other.config.width,a:other.robot.a}));
+        const pushing=(mx*dx+my*dy)/d>.15,constrained=(edge||fixed||third)&&Math.hypot(v.vx,v.vy)<.65;
+        let pin=this.pinRecords.get(key);
+        if(!pin&&pushing&&constrained){pin={attacker:i,victim:j,alliance:ac.alliance,elapsed:0,lastSeen:this.time,nextFoul:3};this.pinRecords.set(key,pin);}
+        if(!pin)continue;
+        if(!constrained){this.pinRecords.delete(key);continue;}
+        seen.add(key);pin.lastSeen=this.time;pin.elapsed+=dt;
+        while(pin.elapsed+1e-8>=pin.nextFoul){this.awardFoul(ac.alliance,'G418','Pin longer than 3 seconds');pin.nextFoul+=3;}
+      }
+      for(const [key,pin] of this.pinRecords)if(!seen.has(key)&&this.time-pin.lastSeen>.25)this.pinRecords.delete(key);
+      this.pinCounts=Array.from(this.pinRecords.values(),p=>({attacker:p.attacker,victim:p.victim,alliance:p.alliance,elapsed:p.elapsed}));
     }
     get target(){return hubs.find(h=>h.alliance===this.config.alliance);}
     get inAllianceZone(){return this.config.alliance==='blue'?this.robot.x<=FIELD.startLine:this.robot.x>=W-FIELD.startLine;}
@@ -524,7 +549,7 @@
         }
         this.loadDriver(0);
       }else this.stepDriver(dt,input);
-      this.assessFouls();
+      this.assessFouls();this.assessPins(dt,this.multiplayer?input:[input]);
       const c=this.config,r=this.robot;
       this.releaseFuel();const kept=[];
       for(const b of this.balls){
