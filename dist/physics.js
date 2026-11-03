@@ -23,7 +23,7 @@
     width:FIELD.hubSize,depth:FIELD.trenchWidth,alliance:h.alliance,sign})));
   const solids = hubs.map(h=>({x:h.x,y:h.y,width:FIELD.hubSize,depth:FIELD.hubSize,height:1.65,hub:true,alliance:h.alliance}));
   for (const t of trenches) solids.push({x:t.x,y:t.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16,width:FIELD.hubSize,depth:.32,height:FIELD.dividerHeight});
-  const TOWER={depth:1.2496,width:1.35,postX:1.0516,postGap:1.25,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[1.05,1.35,1.6002]};
+  const TOWER={depth:1.3004,width:.83,postX:1.1024,postGap:.73,postDepth:.0889,postWidth:.0381,postHeight:1.831,rungDiameter:.04216,rungs:[1.05,1.35,1.6002]};
   const towers=['blue','red'].map(alliance=>({alliance,x:alliance==='blue'?TOWER.postX:W-TOWER.postX,y:H/2}));
   for(const t of towers){
     for(const side of [-1,1])solids.push({x:t.x,y:t.y+side*(TOWER.postGap+TOWER.postWidth)/2,width:TOWER.postDepth,depth:TOWER.postWidth,height:TOWER.postHeight,bottom:0,tower:true});

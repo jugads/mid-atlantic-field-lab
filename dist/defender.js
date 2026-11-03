@@ -189,7 +189,15 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
   }
   const enemy=sim.fleet[opponentIndex].config;
   const bumpOnly=enemy&&(enemy.height>.5652||enemy.width>1.30);
-  if(bumpOnly&&Math.abs(player.x-hubX)<2.7){
+  // Defend the scoring zone when it has enough loose fuel for the opponent;
+  // otherwise protect the bump to interrupt their next neutral-zone trip.
+  if(bumpOnly&&(!Number.isFinite(ds.zoneCheckedAt)||sim.time-ds.zoneCheckedAt>.5)){
+    const blue=enemy.alliance==='blue';
+    const count=sim.balls.filter(b=>!b.shot&&!b.hubInside&&b.z<.3&&(blue?b.x<=4.03:b.x>=16.54-4.03)).length;
+    ds.zoneDefense=ds.zoneDefense?count>=12:count>=20;ds.zoneCheckedAt=sim.time;
+  }
+  const enemyHome=enemy&&(enemy.alliance==='blue'?player.x<=4.03:player.x>=16.54-4.03);
+  if(bumpOnly&&!(ds.zoneDefense&&enemyHome)&&Math.abs(player.x-hubX)<2.7){
     const direction=player.x<8.27?1:-1;
     // Keep the simpler, forgiving bump block on easy and medium.
     if(!hard){
