@@ -19,7 +19,7 @@ function selectRobot(team){
   for(const button of $('robotChoices').children){const active=button.dataset.team===team;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));if(active&&moveFocus)button.focus();}
   $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;
   if(online.active)online.send({type:'select',team});
-  refreshIdentity();updateMatch();
+  refreshIdentity();renderAiSelections();updateMatch();
 }
 function moveChoice(delta){let index=teams.indexOf(selectedTeam);for(let i=0;i<teams.length;i++){index=(index+delta+teams.length)%teams.length;const button=$('robotChoices').children[index];if(!button.disabled){selectRobot(teams[index]);break;}}}
 function createChoices(){
@@ -172,6 +172,7 @@ function networkChanged(msg){
   $('roomCode').textContent=online.room.code;$('roomDescription').textContent=online.room.mode==='3v3coop'?'3v3 CO-OP · BOTH PLAYERS BLUE':online.room.mode==='coop'?'CO-OP · SHARED BLUE SCORE':online.room.mode==='2v2'?'2v2 · ONE BOT PER ALLIANCE':online.room.mode==='3v3'?'3v3 · TWO BOTS PER ALLIANCE':'1v1 · BLUE vs RED';
   $('roomPlayers').replaceChildren(...online.room.players.map(p=>{const row=document.createElement('span');row.textContent=`${p.id===online.id?'You':'Player '+(p.index+1)} · ${p.team} · ${p.alliance.toUpperCase()} — ${!p.connected?'Reconnecting':p.ready?'Ready':'Choosing robot'}`;return row;}));
   if(['3v3','3v3coop'].includes(online.room.mode))for(const player of online.room.players)if(player.aiTeams.length){const row=document.createElement('span');row.textContent=`AI · ${player.aiTeams.join(', ')} · ${player.alliance.toUpperCase()}`;$('roomPlayers').append(row);}
+  if(online.room.mode==='2v2'&&online.room.players.length===2){const used=new Set(online.room.players.map(p=>p.team));for(const alliance of ['blue','red']){const choice=!used.has('2539')?'2539':teams.find(t=>!used.has(t));used.add(choice);const row=document.createElement('span');row.textContent=`AI · ${choice} · ${alliance.toUpperCase()}`;$('roomPlayers').append(row);}}
   if(online.room.mode==='3v3coop'&&online.room.players.length===2){const used=new Set(online.room.players.flatMap(p=>[p.team,...p.aiTeams]));const bots=[];for(let i=0;i<3;i++){const choice=!used.has('2539')?'2539':teams.find(t=>!used.has(t));used.add(choice);bots.push(choice);}const row=document.createElement('span');row.textContent=`AI · ${bots.join(', ')} · RED`;$('roomPlayers').append(row);}
   if(online.room.players.length<2){const row=document.createElement('span');row.textContent='Waiting for player 2… Share the room code.';$('roomPlayers').append(row);}
   if(msg?.type==='room'&&online.room.status==='lobby')previewLobby();
