@@ -116,3 +116,15 @@ const pressured=makeSim();pressured.time=40;pressured.autoWinner='blue';pressure
 Object.assign(pressured.fleet[1].robot,{x:13.8,y:3,a:0});Object.assign(pressured.fleet[0].robot,{x:14.5,y:3,a:0});
 const evadeInput=defenderInput(pressured,'hard');assert(!evadeInput.shoot&&Math.hypot(evadeInput.moveX,evadeInput.moveY)>.1,'hard scorer moves away from nearby defender before shooting');
 console.log('Hard AI disrupts shots with corner contact and evades pressure');
+// A swerve robot should start crossing while turning, choosing the nearest
+// of the two valid trench headings rather than stopping for a 180-degree turn.
+const quickCross=new Simulation({},()=>.5);quickCross.enableMultiplayer([resolve('341'),resolve('316','red')]);quickCross.start();quickCross.time=34;quickCross.autoWinner='blue';
+Object.assign(quickCross.fleet[1].robot,{x:13.6,y:.69,a:1.2,vx:0,vy:0});quickCross.fleet[1].inventory=quickCross.fleet[1].state.inventory=0;
+const crossingInput=defenderInput(quickCross,'hard');assert(crossingInput.moveX<-.5&&crossingInput.turnAxis<0,'hard robot drives and takes the shorter turn through trench');
+// Starting across the opposing hub, hard defense must reach and pressure a
+// shooting opponent instead of driving into the hub and remaining stuck.
+const pursuit=new Simulation({},()=>.5);pursuit.enableMultiplayer([resolve('316','blue'),resolve('316','red')]);pursuit.start();pursuit.time=40;pursuit.autoWinner='red';pursuit.balls=[];
+Object.assign(pursuit.fleet[0].robot,{x:3,y:2.51,a:0,vx:0,vy:0});Object.assign(pursuit.fleet[1].robot,{x:8,y:4,a:Math.PI,vx:0,vy:0});
+let pressure=0;for(let i=0;i<8*120;i++){pursuit.fleet[0].inventory=pursuit.fleet[0].state.inventory=50;pursuit.step(1/120,[{shoot:true},defenderInput(pursuit,'hard')]);if(Math.hypot(pursuit.fleet[0].robot.x-pursuit.fleet[1].robot.x,pursuit.fleet[0].robot.y-pursuit.fleet[1].robot.y)<1.4)pressure++;}
+assert(pressure>4*120,`hard defense should reach and pressure the shooter, got ${pressure/120}s`);
+console.log('Hard AI crosses while turning and pursues through the hub');
