@@ -23,3 +23,14 @@ assert(sent.some(m=>m.type==='snapshot'&&m.fleet.length===2),'host publishes sha
 assert(JSON.stringify(sent.at(-1)).length<65536,'snapshot fits relay payload limit');
 const before=host.hostSim.time;host.room.status='paused';host.advanceHost(1200,{});host.advanceHost(1300,{});assert.equal(host.hostSim.time,before,'paused host does not advance');
 console.log('PASS local movement prediction remains separate from authoritative state');
+globalThis.FieldPhysics=require('../dist/physics.js');globalThis.TeamPresets=require('../dist/team-presets.js');
+const {createHostSimulation}=await import('../dist/multiplayer.js');
+const room2={mode:'2v2',players:[{id:'a',team:'341',alliance:'blue'},{id:'b',team:'316',alliance:'red'}]};
+const four=createHostSimulation(room2);assert.equal(four.fleet.length,4);assert.deepEqual(four.fleet.map(e=>e.config.alliance),['blue','red','blue','red']);
+assert.equal(four.fleet.reduce((n,e)=>n+e.inventory,0),32);assert.equal(four.initialCenterCount,376);
+const host2=new MultiplayerClient(()=>{});host2.id='a';host2.state='connected';host2.room={...room2,status:'playing',hostId:'a'};host2.hostSim=four;
+const messages=[];host2.send=m=>messages.push(m);host2.guestInput={moveX:-1};host2.guestInputAt=1000;
+host2.advanceHost(1000,{});host2.advanceHost(1100,{});assert(messages.some(m=>m.type==='snapshot'&&m.fleet.length===4));
+assert(four.fleet[2].inventory<8||four.fleet[3].inventory<8||four.fleet[2].robot.a!==0||four.fleet[3].robot.a!==Math.PI,'bots receive independent inputs');
+assert(JSON.stringify(messages.at(-1)).length<65536,'four-robot snapshot fits relay payload limit');
+console.log('PASS 2v2 host simulates and publishes four robots');

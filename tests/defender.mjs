@@ -37,3 +37,9 @@ const next=defenderInput(targetSim,'medium');assert(initial.turnAxis>0&&next.tur
 // If a ball cannot be reached, eventually choose a different one.
 targetSim.time+=2.6;const retry=defenderInput(targetSim,'medium');assert(retry.turnAxis<0,'abandon a target when no progress is made');
 console.log('Defender target stability and recovery checks passed');
+const dual=makeSim();dual.enableMultiplayer([resolve('341'),resolve('316','red'),{...resolve('2539','blue'),intakeDirection:'front'},{...resolve('2539','red'),intakeDirection:'front'}]);dual.start();dual.time=34;dual.autoWinner='blue';
+const blueBot=dual.fleet[2],redBot=dual.fleet[3];Object.assign(blueBot.robot,{x:7,y:3,a:0});Object.assign(redBot.robot,{x:9,y:3,a:Math.PI});Object.assign(dual.fleet[1].robot,{x:4,y:3});
+const botDefense=defenderInput(dual,'medium',2,3);assert(botDefense.moveX>0,'blue bot defends against red bot, not the red human');
+const sameSim=makeSim();sameSim.enableMultiplayer([resolve('341'),resolve('316','red'),{...resolve('2539','blue'),intakeDirection:'front'},{...resolve('2539','red'),intakeDirection:'front'}]);sameSim.start();sameSim.fleet[2].inventory=sameSim.fleet[2].state.inventory=0;
+defenderInput(sameSim,'medium',2,3);assert(defenderInput(sameSim,'medium',3,2).shoot,'each bot has independent scoring state');
+console.log('Both bots target each other and use separate strategy state');

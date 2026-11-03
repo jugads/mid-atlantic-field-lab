@@ -102,3 +102,17 @@ test('centered bumper impact produces no significant spin',()=>{
  Object.assign(b.robot,{x:7.8,y:4,a:0,vx:0,vy:0,omega:0,impactOmega:0});
  s.loadDriver(0);s.resolveRobot();assert(Math.abs(b.robot.impactOmega)<1e-8);
 });
+test('2v2 rooms accept four-robot snapshots and preserve human alliances',()=>{
+ let now=1000;const rooms=new Rooms({now:()=>now}),a=socket(),b=socket();
+ rooms.handle(a,{type:'create',protocol:2,mode:'2v2',team:'341'});const room=a.room;
+ rooms.handle(b,{type:'join',protocol:2,code:room.code,team:'316'});
+ assert.deepEqual(rooms.lobby(room).players.map(p=>p.alliance),['blue','red']);
+ rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});now=4001;rooms.tick();
+ const snapshot={type:'snapshot',time:1,fleet:[{},{},{},{}],balls:[],scores:{blue:0,red:0}};
+ rooms.handle(a,snapshot);assert.equal(room.snapshot.fleet.length,4);assert.equal(b.messages.at(-1).fleet.length,4);
+ rooms.handle(a,{...snapshot,time:2,fleet:[{},{}]});assert.equal(room.snapshot.time,1,'wrong fleet size rejected');
+});
+test('1v1 rooms reject four-robot snapshots',()=>{
+ const {rooms,a,b,room,setNow}=lobby();rooms.handle(a,{type:'ready',ready:true});rooms.handle(b,{type:'ready',ready:true});setNow(4001);rooms.tick();
+ rooms.handle(a,{type:'snapshot',time:1,fleet:[{},{},{},{}],balls:[],scores:{blue:0,red:0}});assert.equal(room.snapshot,null);
+});
