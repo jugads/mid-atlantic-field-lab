@@ -28,3 +28,12 @@ const endgame=makeSim();endgame.time=140;const defend=defenderInput(endgame,'med
 const neutral=makeSim();neutral.time=40;neutral.autoWinner='blue';neutral.balls=[{x:10,y:.69,z:.075}];const enemy=neutral.fleet[1];enemy.inventory=enemy.state.inventory=0;Object.assign(enemy.robot,{x:13.6,y:.69,a:Math.PI});
 const seek=defenderInput(neutral,'medium');assert(seek.moveX<0&&seek.intake,'AI heads through the trench for neutral-zone fuel');
 console.log('Defender endgame and neutral fuel checks passed');
+// Nearby balls changing order must not make the robot reverse its steering target.
+const targetSim=makeSim();targetSim.time=40;targetSim.autoWinner='blue';const targetBot=targetSim.fleet[1];
+Object.assign(targetBot.robot,{x:14,y:4,a:0});targetBot.inventory=targetBot.state.inventory=0;
+const first={x:15,y:4.4,z:.075},second={x:15,y:3.5,z:.075};targetSim.balls=[first,second];
+const initial=defenderInput(targetSim,'medium');first.y=4.55;second.y=3.6;targetSim.time+=.1;
+const next=defenderInput(targetSim,'medium');assert(initial.turnAxis>0&&next.turnAxis>0,'stick with a target instead of reversing when another ball becomes closer');
+// If a ball cannot be reached, eventually choose a different one.
+targetSim.time+=2.6;const retry=defenderInput(targetSim,'medium');assert(retry.turnAxis<0,'abandon a target when no progress is made');
+console.log('Defender target stability and recovery checks passed');
