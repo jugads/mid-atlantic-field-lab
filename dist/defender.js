@@ -207,6 +207,15 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
     ds.zoneDefense = ds.zoneDefense ? count >= 12 : count >= 20; ds.zoneCheckedAt = sim.time;
   }
   const enemyHome = enemy && (enemy.alliance === 'blue' ? player.x <= 4.03 : player.x >= 16.54 - 4.03);
+  // Meet an approaching bump-only robot instead of waiting at the guard point.
+  // Work from either side, and ease the drive command once bumpers meet.
+  const approaching = (player.vx || 0) * dx > .12;
+  const nearBump = Math.abs(player.x - hubX) < 2.0 && Math.abs(r.x - hubX) < 2.0;
+  if (bumpOnly && approaching && nearBump && distance < 2.2 && Math.abs(dy) < 1.1) {
+    const throttle = distance > 1.2 ? .7 : .25;
+    const heading = Math.atan2(-dy, -dx), error = Math.atan2(Math.sin(heading - r.a), Math.cos(heading - r.a));
+    return { moveX: -dx / distance * throttle, moveY: -dy / distance * throttle, turnAxis: Math.max(-1, Math.min(1, error * 1.5)), intake: false };
+  }
   const returningOpponent = bumpOnly && !enemyHome && sim.activeAt(enemy.alliance);
   if (returningOpponent) {
     // Guard the home side of the bump while the opponent is outside, so it
