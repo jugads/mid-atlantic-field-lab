@@ -35,3 +35,10 @@ host2.advanceHost(1000,{});host2.advanceHost(1100,{});assert(messages.some(m=>m.
 assert(four.fleet.slice(2).some((e,i)=>e.inventory<8||Math.hypot(e.robot.x-botStarts[i].x,e.robot.y-botStarts[i].y)>.001||Math.abs(e.robot.a-botStarts[i].a)>.001),'bots receive independent inputs');
 assert(JSON.stringify(messages.at(-1)).length<65536,'four-robot snapshot fits relay payload limit');
 console.log('PASS 2v2 host simulates and publishes four robots');
+// Verify actual 2v2 host routing: blue bot chases red human, even when red bot is on the opposite side.
+four.time=40;four.autoWinner='red';four.balls=[];
+Object.assign(four.fleet[0].robot,{x:3,y:6,a:0,vx:0,vy:0});Object.assign(four.fleet[1].robot,{x:5.6,y:3,a:0,vx:0,vy:0});
+Object.assign(four.fleet[2].robot,{x:7,y:3,a:0,vx:0,vy:0});Object.assign(four.fleet[3].robot,{x:9,y:3,a:0,vx:0,vy:0});
+host2.guestInput={};host2.guestInputAt=1100;host2.advanceHost(1200,{});
+assert(four.fleet[2].robot.x<7,'blue bot chases red human instead of red bot');
+console.log('PASS 2v2 bots defend the opposing humans');

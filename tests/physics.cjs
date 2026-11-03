@@ -96,8 +96,8 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
  assert.equal(p1391.capacity,45);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
  assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
  const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.intakeRate,35);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
- const p1640=resolvePreset('1640');assert.equal(p1640.archetype,'turret');assert.equal(p1640.capacity,40);assert.equal(p1640.feedRate,10);assert.equal(p1640.intakeRate,25);assert.equal(p1640.moving,60);assert.equal(p1640.width,p316.width);assert.equal(p1640.length,p316.length);assert.equal(p1640.height,p316.height);assert(canUseTrench(p1640));
- const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.capacity,35);assert.equal(p9094.feedRate,7);assert.equal(p9094.intakeRate,20);assert.equal(p9094.moving,75);
+ const p1640=resolvePreset('1640');assert.equal(p1640.archetype,'turret');assert.equal(p1640.capacity,35);assert.equal(p1640.feedRate,7);assert.equal(p1640.intakeRate,20);assert.equal(p1640.moving,75);assert(canUseTrench(p1640));
+ const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.capacity,40);assert.equal(p9094.feedRate,10);assert.equal(p9094.intakeRate,25);assert.equal(p9094.moving,60);assert.equal(p9094.width,p316.width);assert.equal(p9094.length,p316.length);assert.equal(p9094.height,p316.height);assert(canUseTrench(p9094));
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
 });
 test('5895 has two corner turrets, 40 total capacity and fits the trench',()=>{

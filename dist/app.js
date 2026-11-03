@@ -1,5 +1,5 @@
-import {defenderInput} from './defender.js?v=trench2';
-import {MultiplayerClient} from './multiplayer.js?v=trench2';
+import {defenderInput} from './defender.js?v=pin1';
+import {MultiplayerClient} from './multiplayer.js?v=pin1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -61,6 +61,7 @@ function updateMatch(){
  $('stateLabel').textContent=ready?'MATCH READY':paused?'MATCH PAUSED':preparing?'COUNTDOWN':p.label;
  $('phaseLabel').textContent=ready?'READY FOR AUTO':paused?'PAUSED':preparing?'MATCH STARTING':p.label;
  $('matchClock').textContent=formatTime(sim.matchRemaining);
+ const pin=sim.pinCounts?.find(p=>p.elapsed>0);$('pinNotice').textContent=pin?`${pin.alliance.toUpperCase()} PIN · ${Math.min(3,pin.elapsed).toFixed(1)} / 3s`:'';
  const event=sim.foulEvents?.at(-1);$('foulNotice').textContent=event&&sim.time-event.time<5?`${event.alliance.toUpperCase()} · ${event.rule} · ${event.detail} · +${event.points} to opponent`:'';
  $('foulTotals').textContent=`FOUL POINTS · BLUE +${sim.foulPoints?.blue||0} · RED +${sim.foulPoints?.red||0}`;
  $('shiftClock').textContent=ready?'20s AUTO · 140s TELEOP':preparing?'AUTO begins after countdown':finished?'Final fuel score':`${formatTime(sim.phaseRemaining)} in ${p.label.toLowerCase()}`;
