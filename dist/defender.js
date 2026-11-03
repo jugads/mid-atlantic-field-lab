@@ -235,12 +235,19 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const offset=(xFace?(enemy.width||1):(enemy.length||1))*.38;
     let tx=player.x+player.vx*lead+tangent.x*side*offset,ty=player.y+player.vy*lead+tangent.y*side*offset;
     if(ty<.5||ty>7.57){side=-side;tx=player.x+player.vx*lead+tangent.x*side*offset;ty=player.y+player.vy*lead+tangent.y*side*offset;}
-    // Drive through the offset contact point at full commanded speed to keep
-    // pressure on the shooter; normal acceleration and collision limits apply.
-    tx-=dx/distance*.45;ty-=dy/distance*.45;
+    // Close quickly and bump off-center, then hold position and slide toward a
+    // corner instead of continuously driving through and towing the opponent.
+    tx-=dx/distance*.2;ty-=dy/distance*.2;
     const ax=tx-r.x,ay=ty-r.y,span=Math.hypot(ax,ay)||1;
+    let mx=ax/span,my=ay/span;
+    const contactRange=(Math.hypot(defender.config.length,defender.config.width)+Math.hypot(enemy.length,enemy.width))*.39;
+    if(distance<contactRange){
+      const towardX=-dx/distance,towardY=-dy/distance;
+      const closing=mx*towardX+my*towardY;
+      if(closing>0){const allowed=Math.max(0,Math.min(.22,(distance-contactRange+.25)*.88));mx-=towardX*Math.max(0,closing-allowed);my-=towardY*Math.max(0,closing-allowed);}
+    }
     const heading=Math.atan2(ay,ax),err=Math.atan2(Math.sin(heading-r.a),Math.cos(heading-r.a));
-    return {moveX:ax/span,moveY:ay/span,turnAxis:Math.max(-1,Math.min(1,err*1.5)),intake:true};
+    return {moveX:mx,moveY:my,turnAxis:Math.max(-1,Math.min(1,err*1.5)),intake:true};
   }
   return driveTo(player.x+player.vx*lead,player.y+player.vy*lead);
 }
