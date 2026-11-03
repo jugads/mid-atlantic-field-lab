@@ -1,4 +1,5 @@
 // Scoring uses full drive speed; defense keeps its established difficulty tuning.
+export const defenderTeam=difficulty=>difficulty==='hard'?'316':'2539';
 const scoringState=new WeakMap();
 const defenseState=new WeakMap();
 export function defenderInput(sim, difficulty='medium', botIndex=1, opponentIndex=0) {
@@ -28,8 +29,9 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       state.since=sim.time;state.target=null;state.route=null;state.lane=null;
     }
     if(defender.inventory===0&&!state.collecting){state.collecting=true;state.since=sim.time;state.target=null;}
-    // Fill the hopper before shooting; leave time to score before the shift ends.
-    if(state.collecting&&(defender.inventory>=defender.config.capacity||(defender.inventory>0&&Number.isFinite(sim.phaseRemaining)&&sim.phaseRemaining<=4))){state.collecting=false;state.target=null;state.lane=null;}
+    // Hard mode batches sizable loads for faster cycles and leaves time to return
+    // before its five-second early switch to defense; other levels fill fully.
+    if(state.collecting&&(defender.inventory>=(hard?Math.min(defender.config.capacity,30):defender.config.capacity)||(defender.inventory>0&&Number.isFinite(sim.phaseRemaining)&&sim.phaseRemaining<=(hard&&sim.phase.shift?9:4)))){state.collecting=false;state.target=null;state.lane=null;}
     // Cross the entire structure before re-planning. Crossing the alliance-line
     // alone does not mean the back of the chassis has cleared the divider.
     const crossTrench=(towardHome)=>{

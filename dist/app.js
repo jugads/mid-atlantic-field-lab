@@ -1,4 +1,4 @@
-import {defenderInput} from './defender.js?v=pin1';
+import {defenderInput,defenderTeam} from './defender.js?v=hard3161';
 import {MultiplayerClient} from './multiplayer.js?v=pin1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
@@ -32,7 +32,7 @@ function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.tea
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
-$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset('2539','red'),intakeDirection:'front'}]);countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
+$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
 $('pause').onclick=togglePause;$('reset').onclick=reset;
 $('help').onclick=()=>{if(!online.active&&(sim.running||countdown.running))togglePause();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
 const used=['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight','Space','ShiftLeft','KeyP','KeyR'];
