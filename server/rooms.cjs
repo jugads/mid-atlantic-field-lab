@@ -28,7 +28,7 @@ class Rooms{
       if(socket.room)return this.fail(socket,'Leave your current room first.');
       let room;
       if(msg.type==='create'){
-        if(!['1v1','coop'].includes(msg.mode))return this.fail(socket,'Choose 1v1 or co-op.');
+        if(!['1v1','2v2','coop'].includes(msg.mode))return this.fail(socket,'Choose 1v1, 2v2 with bots, or co-op.');
         if(this.rooms.size>=this.maxRooms)return this.fail(socket,'Server is full. Try again after a match finishes.');
         const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let code;
         do{code=Array.from({length:6},()=>alphabet[randomInt(alphabet.length)]).join('');}while(this.rooms.has(code));
@@ -51,7 +51,7 @@ class Rooms{
     }
     if(msg.type==='snapshot'){
       if(p.id!==room.hostId||!['playing','paused','countdown'].includes(room.status))return;
-      if(!Number.isFinite(msg.time)||msg.time<0||msg.time>166||!Array.isArray(msg.balls)||msg.balls.length>504||!Array.isArray(msg.fleet)||msg.fleet.length!==2||!msg.scores)return;
+      if(!Number.isFinite(msg.time)||msg.time<0||msg.time>166||!Array.isArray(msg.balls)||msg.balls.length>504||!Array.isArray(msg.fleet)||msg.fleet.length!==(room.mode==='2v2'?4:2)||!msg.scores)return;
       if(room.snapshot&&msg.time+0.001<room.snapshot.time)return;
       msg.status=room.status;room.snapshot=msg;room.snapshotAt=this.now();
       for(const other of room.players)if(other.id!==room.hostId)this.send(other.socket,msg);
