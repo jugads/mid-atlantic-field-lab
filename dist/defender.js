@@ -72,10 +72,13 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       const entryClear=dir>0?r.x<=route.entry+.12:r.x>=route.entry-.12;
       if(!entryClear&&Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,r.y,true,1);
       if(Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,route.lane,true,1);
-      // Face straight down the trench before moving, so the corners clear it.
-      const angle=dir>0?0:Math.PI,error=Math.atan2(Math.sin(angle-r.a),Math.cos(angle-r.a));
-      if(Math.abs(error)>.14)return {turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
-      return {moveX:dir,moveY:Math.max(-.25,Math.min(.25,(route.lane-r.y)*2)),turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
+      // Swerve can cross in either orientation. Turn toward whichever is
+      // closer while moving; bump lanes have enough width to keep heading.
+      const isTrench=route.lane<1||route.lane>7;
+      const e0=Math.atan2(Math.sin(-r.a),Math.cos(-r.a)),e1=Math.atan2(Math.sin(Math.PI-r.a),Math.cos(Math.PI-r.a));
+      const error=Math.abs(e0)<Math.abs(e1)?e0:e1;
+      if(!hard&&isTrench&&Math.abs(error)>.14)return {turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:true};
+      return {moveX:dir,moveY:Math.max(-.35,Math.min(.35,(route.lane-r.y)*3)),turnAxis:isTrench?Math.max(-1,Math.min(1,error*2)):0,intake:true};
     };
     if(state.escape){
       if(sim.time<state.escape.until&&Math.abs(r.x-state.escape.x)>.2)return driveTo(state.escape.x,state.escape.y,true,1);
@@ -177,6 +180,31 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const blockX=hubX+(player.x<8.27?1:-1)*1.1;
     return driveTo(blockX,side,false,.95);
   }
+  // Pursuit must route around the opponent hub and divider even when the
+  // player is far away; a straight line into the hub wastes an entire shift.
+  if(hard){
+    const obstacleX=player.x<8.27?4.627:11.913;
+    const separated=(r.x-obstacleX)*(player.x-obstacleX)<0&&Math.abs(r.x-obstacleX)>.65&&Math.abs(player.x-obstacleX)>.65;
+    if(separated||ds.cross){
+      if(!ds.cross){
+        const lanes=[.69,2.51,5.56,7.38],dir=Math.sign(player.x-r.x);
+        const lane=lanes.reduce((best,y)=>Math.abs(r.y-y)+Math.abs(player.y-y)<Math.abs(r.y-best)+Math.abs(player.y-best)?y:best);
+        ds.cross={lane,dir,entry:obstacleX-dir*1.35,exit:obstacleX+dir*1.35};
+      }
+      const p=ds.cross;
+      if((p.dir>0?r.x>=p.exit:r.x<=p.exit)||Math.abs(player.x-r.x)<1.6)ds.cross=null;
+      else {
+        // Move diagonally toward the entrance whenever the chassis is clear.
+        if(Math.abs(r.y-p.lane)>.25){
+          const atSafeSide=p.dir>0?r.x<=p.entry:r.x>=p.entry;
+          return driveTo(atSafeSide?p.entry:r.x,p.lane,false,1);
+        }
+        const e0=Math.atan2(Math.sin(-r.a),Math.cos(-r.a)),e1=Math.atan2(Math.sin(Math.PI-r.a),Math.cos(Math.PI-r.a));
+        const error=Math.abs(e0)<Math.abs(e1)?e0:e1;
+        return {moveX:p.dir,moveY:Math.max(-.35,Math.min(.35,(p.lane-r.y)*3)),turnAxis:(p.lane<1||p.lane>7)?Math.max(-1,Math.min(1,error*2)):0};
+      }
+    }
+  }
   const lead=easy?0:Math.min(hard?.7:.16,distance/(hard?6:12));
   if(hard&&enemy){
     // Aim at an offset on the near face rather than the center. Bumper contact
@@ -189,7 +217,12 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const offset=(xFace?(enemy.width||1):(enemy.length||1))*.38;
     let tx=player.x+player.vx*lead+tangent.x*side*offset,ty=player.y+player.vy*lead+tangent.y*side*offset;
     if(ty<.5||ty>7.57){side=-side;tx=player.x+player.vx*lead+tangent.x*side*offset;ty=player.y+player.vy*lead+tangent.y*side*offset;}
-    return driveTo(tx,ty,true,1);
+    // Drive through the offset contact point at full commanded speed to keep
+    // pressure on the shooter; normal acceleration and collision limits apply.
+    tx-=dx/distance*.45;ty-=dy/distance*.45;
+    const ax=tx-r.x,ay=ty-r.y,span=Math.hypot(ax,ay)||1;
+    const heading=Math.atan2(ay,ax),err=Math.atan2(Math.sin(heading-r.a),Math.cos(heading-r.a));
+    return {moveX:ax/span,moveY:ay/span,turnAxis:Math.max(-1,Math.min(1,err*1.5)),intake:true};
   }
   return driveTo(player.x+player.vx*lead,player.y+player.vy*lead);
 }
