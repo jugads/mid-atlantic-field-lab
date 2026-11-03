@@ -1,7 +1,7 @@
 /* Built-in profiles supplied by the user. Unspecified values are archetype defaults. */
 (function(root){
   const names={
-    '193':'MORT Beta','316':'LUNATECS','341':'Miss Daisy','365':'Miracle Workerz','1218':'SCH Robotics',
+    '193':'Team 193','316':'LUNATECS','341':'Miss Daisy','365':'Miracle Workerz','1218':'SCH Robotics',
     '1391':'The Metal Moose','1403':'Cougar Robotics','1640':'Sab-BOT-age',
     '1676':'The Pascack PI-oneers','1923':'The MidKnight Inventors',
     '5895':'Peddie Robotics','2539':'Krypton Cougars','2590':'Nemesis','2607':'The Fighting RoboVikings','8513':'Sisters 1st','9094':'Team 9094'
