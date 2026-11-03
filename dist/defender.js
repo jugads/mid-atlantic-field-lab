@@ -47,7 +47,7 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
         const half=defender.config.length/2+.18;
         const homeEdge=red?16.54-4.03+half:4.03-half;
         const neutralEdge=red?16.54-4.03-1.194-half:4.03+1.194+half;
-        state.route={towardHome,lane,entry:towardHome?neutralEdge:homeEdge,exit:towardHome?homeEdge:neutralEdge,lastX:r.x,lastY:r.y,progressAt:sim.time};
+        state.route={towardHome,lane,entry:towardHome?neutralEdge:homeEdge,exit:towardHome?homeEdge:neutralEdge,lastX:r.x,lastY:r.y,progressAt:sim.time,chosenAt:sim.time};
       }
       const route=state.route,dir=Math.sign(route.exit-route.entry);
       // If contact or a hub corner prevents progress, retreat from the
@@ -58,6 +58,13 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
         state.escape={x:(red?16.54-4.03-1.194/2:4.03+1.194/2)+side*1.65,y:r.y,until:sim.time+2};
         state.avoidLane={y:route.lane,until:sim.time+6};state.route=null;
         return driveTo(state.escape.x,state.escape.y,true,1);
+      }
+      // A moving defender can cut off a lane after it was selected. Replan
+      // while still on the approach side, before entering the narrow crossing.
+      const ahead=dir>0?r.x<route.entry+.2:r.x>route.entry-.2;
+      if(hard&&ahead&&sim.time-route.chosenAt>.5&&Math.abs(player.x-(route.entry+route.exit)/2)<1.45&&Math.abs(player.y-route.lane)<1.1){
+        state.avoidLane={y:route.lane,until:sim.time+3};state.route=null;
+        return crossTrench(towardHome);
       }
       const passed=dir>0?r.x>=route.exit-.10:r.x<=route.exit+.10;
       if(passed){state.route=null;return null;}
@@ -77,6 +84,17 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     if(state.route){const crossing=crossTrench(state.route.towardHome);if(crossing)return crossing;}
     if(!state.collecting&&defender.inventory>0){
       if(!home){const crossing=crossTrench(true);if(crossing)return crossing;}
+      if(hard){
+        // If the defender is about to make contact, reposition inside the
+        // alliance zone before shooting instead of sitting and being pinned.
+        if(state.evade&&(sim.time>state.evade.until||Math.hypot(r.x-state.evade.x,r.y-state.evade.y)<.45))state.evade=null;
+        if(!state.evade&&sim.time>(state.evadeCooldown||0)&&Math.hypot(player.x-r.x,player.y-r.y)<1.55){
+          const candidates=[2.15,3,5.07,5.92].map(y=>({x:red?14.05:16.54-14.05,y}));
+          candidates.sort((a,b)=>(Math.hypot(b.x-player.x,b.y-player.y)-.55*Math.hypot(b.x-r.x,b.y-r.y))-(Math.hypot(a.x-player.x,a.y-player.y)-.55*Math.hypot(a.x-r.x,a.y-r.y)));
+          state.evade={...candidates[0],until:sim.time+1.8};state.evadeCooldown=sim.time+3;
+        }
+        if(state.evade)return driveTo(state.evade.x,state.evade.y,false,1);
+      }
       return {shoot:true};
     }
     // Seek loose fuel in home or the neutral zone, staying on our side of
@@ -160,5 +178,18 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     return driveTo(blockX,side,false,.95);
   }
   const lead=easy?0:Math.min(hard?.7:.16,distance/(hard?6:12));
+  if(hard&&enemy){
+    // Aim at an offset on the near face rather than the center. Bumper contact
+    // then applies a realistic turning impulse through the collision model.
+    const c=Math.cos(player.a),s=Math.sin(player.a),localX=dx*c+dy*s,localY=-dx*s+dy*c;
+    const xFace=Math.abs(localX)/(enemy.length||1)>=Math.abs(localY)/(enemy.width||1);
+    const tangent=xFace?{x:-s,y:c}:{x:c,y:s};
+    const lateral=xFace?localY:localX;
+    let side=Math.abs(lateral)>.08?Math.sign(lateral):(player.y<4.035?1:-1);
+    const offset=(xFace?(enemy.width||1):(enemy.length||1))*.38;
+    let tx=player.x+player.vx*lead+tangent.x*side*offset,ty=player.y+player.vy*lead+tangent.y*side*offset;
+    if(ty<.5||ty>7.57){side=-side;tx=player.x+player.vx*lead+tangent.x*side*offset;ty=player.y+player.vy*lead+tangent.y*side*offset;}
+    return driveTo(tx,ty,true,1);
+  }
   return driveTo(player.x+player.vx*lead,player.y+player.vy*lead);
 }
