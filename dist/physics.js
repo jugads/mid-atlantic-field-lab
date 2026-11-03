@@ -94,6 +94,7 @@
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
       const c=this.config;
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
+      this.fouls={blue:{minor:0,major:0},red:{minor:0,major:0}};this.foulPoints={blue:0,red:0};this.foulEvents=[];this.autoAcross=new Set();this.contactEpisodes=new Set();
       this.fired=0;this.passed=0;this.resolved=0;this.made=0;this.inactiveMade=0;this.recycled=0;this.time=0;
       this.nextTurret=0;this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
       this.aimController={integral:0,previousError:null,rate:0};this.turretController={integral:0,previousError:null,rate:0};this.turretAngle=this.robot.a;
@@ -126,6 +127,40 @@
     loadDriver(index){
       this.activeIndex=index;const entry=this.fleet[index];this.robot=entry.robot;this.config=entry.config;
       Object.assign(this,entry.state);this.score=this.scores[this.config.alliance];
+    }
+    awardFoul(offender,rule,detail){
+      const opponent=offender==='blue'?'red':'blue';this.fouls[offender].major++;this.foulPoints[opponent]+=15;this.scores[opponent]+=15;
+      this.foulEvents.push({time:this.time,alliance:offender,rule,detail,points:15});
+      if(this.foulEvents.length>12)this.foulEvents.shift();this.score=this.scores[this.config.alliance];
+    }
+    fullyAcrossCenter(entry){const r=entry.robot,c=entry.config,extent=Math.abs(Math.cos(r.a))*c.length/2+Math.abs(Math.sin(r.a))*c.width/2;
+      return c.alliance==='blue'?r.x-extent>W/2:r.x+extent<W/2;}
+    touchingOwnTower(entry){const r=entry.robot,c=entry.config,t=towers.find(t=>t.alliance===c.alliance);if(!t)return false;
+      const base={x:c.alliance==='blue'?TOWER.depth/2:W-TOWER.depth/2,y:H/2,width:TOWER.depth+.04,depth:TOWER.width+.04,a:0};
+      if(r.z<=.04&&rectangleContact(r,c.length,c.width,base))return true;
+      return solids.some(b=>b.tower&&Math.abs(b.x-t.x)<TOWER.depth&&r.z<b.height+.02&&r.z+c.height>(b.bottom||0)-.02&&rectangleContact(r,c.length+.04,c.width+.04,b));
+    }
+    assessFouls(){
+      if(!this.controlsEnabled)return;
+      const drivers=this.multiplayer?this.fleet:[{robot:this.robot,config:this.config}];
+      const across=drivers.map(e=>this.phase.id==='auto'&&this.fullyAcrossCenter(e));
+      for(let i=0;i<drivers.length;i++){
+        if(across[i]&&!this.autoAcross.has(i))this.awardFoul(drivers[i].config.alliance,'G403','Crossed center in AUTO');
+        if(across[i])this.autoAcross.add(i);else this.autoAcross.delete(i);
+      }
+      if(this.foulPhase!==this.phase.id){this.contactEpisodes.clear();this.foulPhase=this.phase.id;}
+      const touching=new Set();
+      for(let i=0;i<drivers.length;i++)for(let j=i+1;j<drivers.length;j++){
+        const a=drivers[i],b=drivers[j];if(a.config.alliance===b.config.alliance)continue;
+        if(!rectangleContact(a.robot,a.config.length+.05,a.config.width+.05,{x:b.robot.x,y:b.robot.y,width:b.config.length,depth:b.config.width,a:b.robot.a}))continue;
+        const key=i+':'+j;touching.add(key);if(this.contactEpisodes.has(key))continue;
+        if(this.phase.id==='auto'){if(across[i])this.awardFoul(a.config.alliance,'G403','Contact after crossing in AUTO');if(across[j])this.awardFoul(b.config.alliance,'G403','Contact after crossing in AUTO');}
+        if(this.phase.id==='endgame'){
+          if(this.touchingOwnTower(a))this.awardFoul(b.config.alliance,'G420','Contact with opponent on tower');
+          if(this.touchingOwnTower(b))this.awardFoul(a.config.alliance,'G420','Contact with opponent on tower');
+        }
+      }
+      this.contactEpisodes=touching;
     }
     get target(){return hubs.find(h=>h.alliance===this.config.alliance);}
     get inAllianceZone(){return this.config.alliance==='blue'?this.robot.x<=FIELD.startLine:this.robot.x>=W-FIELD.startLine;}
@@ -481,6 +516,7 @@
         }
         this.loadDriver(0);
       }else this.stepDriver(dt,input);
+      this.assessFouls();
       const c=this.config,r=this.robot;
       this.releaseFuel();const kept=[];
       for(const b of this.balls){
