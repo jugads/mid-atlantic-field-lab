@@ -99,6 +99,7 @@
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
       this.fouls={blue:{minor:0,major:0},red:{minor:0,major:0}};this.foulPoints={blue:0,red:0};this.foulEvents=[];this.autoAcross=new Set();this.contactEpisodes=new Set();this.pinRecords=new Map();this.pinCounts=[];
       this.fired=0;this.passed=0;this.resolved=0;this.made=0;this.inactiveMade=0;this.recycled=0;this.time=0;
+      this.matchStats={periods:{},robots:this.fleet.map(e=>({team:e.config.team,alliance:e.config.alliance,shots:0,passes:0,resolved:0,made:0,points:0,collected:0,cycles:0,loading:false}))};
       this.nextTurret=0;this.running=false;this.started=false;this.intake=true;this.intakeClock=0;this.fireClock=0;this.feedBudget=0;this.feedThreshold=1;
       this.aimController={integral:0,previousError:null,rate:0};this.turretController={integral:0,previousError:null,rate:0};this.turretAngle=this.robot.a;
       this.autoWinner=null;this.tieChoice=this.random()<.5?'blue':'red';this.balls=[];this.pending=[];this.flashes=[];
@@ -375,17 +376,19 @@
             vx+=(margin-miss)*nx/t;vy+=(margin-miss)*ny/t;}
         }
         this.balls.push({...ball(ox,oy,launch),vx,vy,vz:(h.z-launch+.5*G*t*t)/t,
-          shot:!passing,pass:passing,shooter:c.alliance,eligible:!passing,launchTime:this.time,lane});
+          shot:!passing,pass:passing,shooter:c.alliance,shooterIndex:this.activeIndex,eligible:!passing,launchTime:this.time,lane});
+        const stats=this.matchStats.robots[this.activeIndex];if(stats){if(passing)stats.passes++;else stats.shots++;if(stats.loading){stats.cycles++;stats.loading=false;}}
         if(c.archetype==='double_turret')this.nextTurret=1-this.nextTurret;
         this.inventory--;if(passing)this.passed++;else this.fired++;
       }
       return count;
     }
     processHub(b,h){
-      if(b.shot&&!b.checked)this.resolved++;
+      if(b.shot&&!b.checked){this.resolved++;const stat=this.matchStats.robots[b.shooterIndex];if(stat)stat.resolved++;}
       this.made+=b.shot?1:0;
+      if(b.shot){const stat=this.matchStats.robots[b.shooterIndex];if(stat)stat.made++;}
       const credit=b.shot&&b.eligible&&b.shooter===h.alliance&&this.canScore(h.alliance);
-      if(credit){this.scores[h.alliance]++;if(this.time<23)this.autoScores[h.alliance]++;this.score=this.scores[this.config.alliance];}
+      if(credit){this.scores[h.alliance]++;if(this.time<23)this.autoScores[h.alliance]++;this.score=this.scores[this.config.alliance];const stat=this.matchStats.robots[b.shooterIndex];if(stat)stat.points++;const id=this.phase.id==='auto-settle'?'auto':this.phase.id==='final-settle'?'endgame':this.phase.id;const period=this.matchStats.periods[id]||(this.matchStats.periods[id]={blue:0,red:0});period[h.alliance]++;}
       else if(b.shot)this.inactiveMade++;
       this.pending.push({alliance:h.alliance,release:this.time+.6+this.random()*.4,exit:Math.floor(this.random()*4)});
       this.flashes.push({x:h.x,y:h.y,life:.7,scored:credit});
@@ -494,7 +497,7 @@
           forward=dx*ca+dy*sa,side=-dx*sa+dy*ca;
           if(this.controlsEnabled&&this.intake&&this.inventory<c.capacity&&this.intakeClock<=1e-8&&
             b.z<r.z+.3&&forward*intakeSign(c)>c.length/2-.1&&forward*intakeSign(c)<c.length/2+.3&&Math.abs(side)<c.width/2+.04){
-            this.inventory++;this.intakeClock+=1/c.intakeRate;return true;}
+            this.inventory++;this.intakeClock+=1/c.intakeRate;const stat=this.matchStats.robots[this.activeIndex];if(stat){stat.collected++;stat.loading=true;}return true;}
           // Resolve in the moving contact frame; add its velocity back exactly once.
           const pointVx=r.vx-r.omega*dy,pointVy=r.vy+r.omega*dx;
           const incomingSpeed=Math.hypot(b.vx,b.vy),rvx=b.vx-pointVx,rvy=b.vy-pointVy;
@@ -581,7 +584,7 @@
         const floor=terrainHeight(b.x,b.y)+BR;
         if(b.z<=floor){const impact=Math.max(0,-b.vz);if(impact>1){const grip=Math.max(.25,1-impact*.065);b.vx*=grip;b.vy*=grip;}b.z=floor;b.vz=Math.abs(b.vz)>.8?-b.vz*.35:0;b.vx*=Math.exp(-1.15*dt);b.vy*=Math.exp(-1.15*dt);
           if(floor>BR+.001){const eps=.005;b.vx-=G*(terrainHeight(b.x+eps,b.y)-terrainHeight(b.x-eps,b.y))/(2*eps)*dt;}
-          if(b.shot){if(!b.checked)this.resolved++;b.shot=false;b.checked=true;}}
+          if(b.shot){if(!b.checked){this.resolved++;const stat=this.matchStats.robots[b.shooterIndex];if(stat)stat.resolved++;}b.shot=false;b.checked=true;}}
         if(b.x<BR||b.x>W-BR){b.x=clamp(b.x,BR,W-BR);b.vx*=-.55;}
         if(b.y<BR||b.y>H-BR){b.y=clamp(b.y,BR,H-BR);b.vy*=-.55;}
         for(const box of solids)if(!(box.hub&&box.alliance===b.hubInside))this.collideBallBox(b,box);
