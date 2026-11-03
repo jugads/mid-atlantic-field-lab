@@ -211,10 +211,34 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   // Work from either side, and ease the drive command once bumpers meet.
   const approaching = (player.vx || 0) * dx > .12;
   const nearBump = Math.abs(player.x - hubX) < 2.0 && Math.abs(r.x - hubX) < 2.0;
-  if (bumpOnly && approaching && nearBump && distance < 2.2 && Math.abs(dy) < 1.1) {
-    const throttle = distance > 1.2 ? .7 : .25;
-    const heading = Math.atan2(-dy, -dx), error = Math.atan2(Math.sin(heading - r.a), Math.cos(heading - r.a));
-    return { moveX: -dx / distance * throttle, moveY: -dy / distance * throttle, turnAxis: Math.max(-1, Math.min(1, error * 1.5)), intake: false };
+  if (!nearBump || distance > 2.4) ds.bumpAnchor = null;
+  // Travel around the near end of the hub before changing bump lanes. Driving
+  // straight sideways at the hub face would leave the defender stuck there.
+  if (hard && bumpOnly && Math.abs(player.x - hubX) < 4 && distance > 1.6) {
+    const predictedY = player.y + (player.vy || 0) * .3;
+    const lane = predictedY < 8.07 / 2 ? 2.51 : 8.07 - 2.51;
+    if (!ds.laneShift && (r.y - 8.07 / 2) * (lane - 8.07 / 2) < 0 && Math.abs(r.x - hubX) < 1.5) {
+      ds.laneShift = { x: hubX + (r.x < hubX ? -1 : 1) * 1.4, lane };
+    }
+    if (ds.laneShift) {
+      const path = ds.laneShift; path.lane = lane;
+      if ((r.y - 8.07 / 2) * (lane - 8.07 / 2) > 0 && Math.abs(r.y - lane) < .5) ds.laneShift = null;
+      else if (Math.abs(r.x - path.x) > .2) return driveTo(path.x, r.y, false, 1);
+      else return driveTo(path.x, lane, false, 1);
+    }
+  } else if (!bumpOnly) ds.laneShift = null;
+  if (bumpOnly && nearBump && distance < (hard ? 3.5 : 2.2) && Math.abs(dy) < 1.1 && (approaching || (hard && ds.bumpEngagedUntil > sim.time))) {
+    if (hard && approaching) ds.bumpEngagedUntil = sim.time + 1.5;
+    // Hard mode holds bumper pressure through contact instead of yielding as
+    // soon as the opposing robot slows; use bounded displacement and the pin
+    // release above rather than driving it across the field indefinitely.
+    if (!ds.bumpAnchor && distance < 1.25) ds.bumpAnchor = {x: player.x, y: player.y};
+    const pushed = ds.bumpAnchor ? ((player.x - ds.bumpAnchor.x) * -dx + (player.y - ds.bumpAnchor.y) * -dy) / distance : 0;
+    const throttle = hard ? (pushed < .8 ? 1 : .25) : (distance > 1.2 ? .7 : .25);
+    // Keep the bumper square to resist being deflected around the side.
+    const e0 = Math.atan2(Math.sin(-r.a), Math.cos(-r.a)), e1 = Math.atan2(Math.sin(Math.PI-r.a), Math.cos(Math.PI-r.a));
+    const error = Math.abs(e0) < Math.abs(e1) ? e0 : e1;
+    return { moveX: -dx / distance * throttle, moveY: -dy / distance * throttle, turnAxis: Math.max(-1, Math.min(1, error * 2)), intake: false };
   }
   const returningOpponent = bumpOnly && !enemyHome && sim.activeAt(enemy.alliance);
   if (returningOpponent) {
