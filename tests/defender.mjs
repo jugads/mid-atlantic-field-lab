@@ -106,3 +106,13 @@ for(const y of [.69,7.38]){
  assert(blocked.scores.red>=30,`hard AI should score around a robot blocking trench y=${y}; got ${blocked.scores.red}`);
 }
 console.log('Hard scoring AI navigates around blocked trenches');
+// Hard defense should hit off center and turn the opponent through actual
+// robot collision physics, while still respecting the pin-release rule.
+const cornerDefense=new Simulation({},()=>.5);cornerDefense.enableMultiplayer([resolve('316','blue'),resolve('316','red')]);cornerDefense.start();cornerDefense.time=40;cornerDefense.autoWinner='red';cornerDefense.balls=[];
+Object.assign(cornerDefense.fleet[0].robot,{x:7,y:4,a:0,vx:0,vy:0});Object.assign(cornerDefense.fleet[1].robot,{x:9,y:4,a:Math.PI,vx:0,vy:0});
+let rotation=0;for(let i=0;i<180;i++){cornerDefense.step(1/120,[{},defenderInput(cornerDefense,'hard')]);rotation=Math.max(rotation,Math.abs(cornerDefense.fleet[0].robot.impactOmega||0));}
+assert(rotation>.3,`hard defender should rotate opponent on contact; got ${rotation}`);
+const pressured=makeSim();pressured.time=40;pressured.autoWinner='blue';pressured.fleet[1].config=resolve('316','red');pressured.fleet[1].inventory=pressured.fleet[1].state.inventory=50;
+Object.assign(pressured.fleet[1].robot,{x:13.8,y:3,a:0});Object.assign(pressured.fleet[0].robot,{x:14.5,y:3,a:0});
+const evadeInput=defenderInput(pressured,'hard');assert(!evadeInput.shoot&&Math.hypot(evadeInput.moveX,evadeInput.moveY)>.1,'hard scorer moves away from nearby defender before shooting');
+console.log('Hard AI disrupts shots with corner contact and evades pressure');
