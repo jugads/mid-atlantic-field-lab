@@ -145,7 +145,15 @@
       const drivers=this.multiplayer?this.fleet:[{robot:this.robot,config:this.config}];
       const across=drivers.map(e=>this.phase.id==='auto'&&this.fullyAcrossCenter(e));
       for(let i=0;i<drivers.length;i++){
-        if(across[i]&&!this.autoAcross.has(i))this.awardFoul(drivers[i].config.alliance,'G403','Crossed center in AUTO');
+        if(across[i]&&!this.autoAcross.has(i)){
+          this.awardFoul(drivers[i].config.alliance,'G403','Crossed center in AUTO');
+          // A robot that crosses while already touching an opponent also incurs
+          // the additional contact penalty; a newly started contact is handled below.
+          for(let j=0;j<drivers.length;j++)if(j!==i&&drivers[i].config.alliance!==drivers[j].config.alliance){
+            const key=Math.min(i,j)+':'+Math.max(i,j),a=drivers[i],b=drivers[j];
+            if(this.contactEpisodes.has(key)&&rectangleContact(a.robot,a.config.length+.05,a.config.width+.05,{x:b.robot.x,y:b.robot.y,width:b.config.length,depth:b.config.width,a:b.robot.a}))this.awardFoul(a.config.alliance,'G403','Contact after crossing in AUTO');
+          }
+        }
         if(across[i])this.autoAcross.add(i);else this.autoAcross.delete(i);
       }
       if(this.foulPhase!==this.phase.id){this.contactEpisodes.clear();this.foulPhase=this.phase.id;}
