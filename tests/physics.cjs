@@ -95,7 +95,7 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
  assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
  assert.equal(p1391.capacity,45);assert.equal(p1391.maxRange,3.6);assert(p1391.height<FIELD.trenchClearance);assert.equal(p1391.feedRate,15);assert.equal(p1391.lanes,4);assert.equal(p1391.intakeRate,20);assert.equal(p1391.moving,0);
  assert.equal(p8513.capacity,80);assert.equal(p8513.height,.762);assert.equal(p8513.feedRate,20);assert.equal(p8513.intakeRate,25);assert.equal(p8513.moving,0);
- const p193=resolvePreset('193');for(const k of ['height','capacity','feedRate','moving','lanes'])assert.equal(p193[k],p8513[k],k);assert.equal(p193.intakeRate,35);assert.equal(p193.maxRange,2);assert.equal(p193.intakeDirection,p1391.intakeDirection);assert.equal(p193.shooterMount,p1391.shooterMount);assert.equal(p193.shooterDirection,p1391.shooterDirection);
+ const p708=resolvePreset('708');assert.equal(resolvePreset('193'),null);assert.equal(p708.archetype,'turret');assert.equal(p708.capacity,55);assert.equal(p708.feedRate,8);assert.equal(p708.intakeRate,15);assert.equal(p708.moving,45);assert(!canUseTrench(p708));for(const alliance of ['blue','red'])assert.equal(new Simulation(resolvePreset('708',alliance)).robot.startArea,'bump');
  const p1640=resolvePreset('1640');assert.equal(p1640.archetype,'turret');assert.equal(p1640.capacity,35);assert.equal(p1640.feedRate,7);assert.equal(p1640.intakeRate,20);assert.equal(p1640.moving,75);assert(canUseTrench(p1640));
  const p9094=resolvePreset('9094');assert.equal(p9094.archetype,'turret');assert.equal(p9094.capacity,40);assert.equal(p9094.feedRate,10);assert.equal(p9094.intakeRate,25);assert.equal(p9094.moving,60);assert.equal(p9094.width,p316.width);assert.equal(p9094.length,p316.length);assert.equal(p9094.height,p316.height);assert(canUseTrench(p9094));
  assert.equal(resolvePreset('316','red').alliance,'red');assert.equal(resolvePreset('unknown'),null);
@@ -277,17 +277,13 @@ test('PID aiming moves at a limited rate, converges, and respects driver turn in
  assert(Math.abs(t.turretAngle-initialTurret)<=2/120+1e-8);advance(t,1);assert(Math.abs(Math.atan2(Math.sin(t.aimAngle-t.turretAngle),Math.cos(t.aimAngle-t.turretAngle)))<.08);
 });
 test('all dumpers lock rotation to their aiming target while shooting on the move',()=>{
- for(const team of ['316','1391','8513','193']){
+ for(const team of ['316','1391','8513']){
  const s=empty(resolvePreset(team));s.start();s.time=25;Object.assign(s.robot,{x:2,y:2,a:0,vx:0,vy:0});s.inventory=40;
  advance(s,1,{moveY:.5,shoot:true,clockwise:true,turnAxis:1});
  const error=Math.atan2(Math.sin(s.chassisAimAngle-s.robot.a),Math.cos(s.chassisAimAngle-s.robot.a));
  assert(Math.abs(error)<.07,'chassis should follow the target despite manual turn input');assert(s.fired>0);assert(Math.hypot(s.robot.vx,s.robot.vy)>.15);
  s.inventory=0;const a=s.robot.a;advance(s,.1,{clockwise:true});assert(s.robot.a>a,'manual turning returns after shooting');
  }
-});
-test('193 scoring shots beyond two meters fall short, while passing remains available',()=>{
- const s=empty(resolvePreset('193'));s.robot.x=s.target.x-2.1;s.robot.y=s.target.y;assert(s.inAllianceZone);assert(s.shotSolution.outOfRange);assert.equal(s.shotSolution.reach,2);
- s.robot.x=s.target.x-1.9;assert(!s.shotSolution.outOfRange);s.robot.x=W/2;assert(s.shotSolution.passing);assert(!s.shotSolution.outOfRange);
 });
 test('rear shooters aim and launch from the back when scoring and passing',()=>{
  for(const team of ['316','8513'])for(const x of [2.5,W/2]){
