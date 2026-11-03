@@ -11,7 +11,7 @@ let selectedTeam='341',keys=new Set(),last=0,accumulator=0,suppressGamepadShoot=
 
 function selectRobot(team){
   if(sim.started||countdown.active||!profiles[team]||online.active&&online.room.status!=='lobby')return;
-  selectedTeam=team;sim.multiplayer=false;sim.activeIndex=0;sim.roster=[resolvePreset(team)];sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
+  selectedTeam=team;if(!online.active){sim.multiplayer=false;sim.activeIndex=0;sim.roster=[resolvePreset(team)];}sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
   const moveFocus=document.activeElement?.classList.contains('robot-choice');
   for(const button of $('robotChoices').children){const active=button.dataset.team===team;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));if(active&&moveFocus)button.focus();}
   $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;
