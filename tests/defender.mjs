@@ -11,8 +11,7 @@ bot.inventory=0;assert.deepEqual(defenderInput(sim,'medium'),{},'AUTO never purs
 sim.phase.id='shift1';assert.deepEqual(defenderInput(sim,'medium'),{},'empty robot does not defend during its active shift');
 bot.inventory=8;robot.x=10;assert(!defenderInput(sim,'medium').shoot&&Math.hypot(defenderInput(sim,'medium').moveX,defenderInput(sim,'medium').moveY)>0,'active robot returns to its zone');
 sim.activeAt=()=>false;const easy=defenderInput(sim,'easy'),medium=defenderInput(sim,'medium'),hard=defenderInput(sim,'hard');
-assert(Math.hypot(easy.moveX,easy.moveY)<Math.hypot(medium.moveX,medium.moveY));
-assert(Math.hypot(medium.moveX,medium.moveY)<Math.hypot(hard.moveX,hard.moveY));assert.equal(hard.intake,true);
+assert.equal(Math.hypot(easy.moveX,easy.moveY),Math.hypot(medium.moveX,medium.moveY),'easier defenses use the same drive speed');assert.equal(hard.intake,true);
 console.log('Defender phase and difficulty checks passed');
 // Exercise a full scoring cycle and a return from the far side using real physics.
 const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
@@ -86,7 +85,7 @@ console.log('AI escapes a blocked trench via the bump');
 // A full hard-mode shift should complete three collection/shooting cycles
 // while still leaving the last five seconds for defense.
 assert.equal(defenderTeam('hard'),'316');
-assert.equal(defenderTeam('medium'),'2539');
+assert.equal(defenderTeam('medium'),'316');assert.equal(defenderTeam('easy'),'316');
 const hardShift=new Simulation({},()=>.5);hardShift.enableMultiplayer([resolve('341'),resolve('316','red')]);hardShift.start();hardShift.time=33;hardShift.autoWinner='blue';
 let bursts=0,shooting=false;
 for(let i=0;i<20*120;i++){
@@ -175,3 +174,13 @@ for(const alliance of ['blue','red'])for(const y of [2.51,5.56]){
  assert(Math.abs(s.fleet[1].robot.y-y)<.8,`${alliance} defender should block chosen bump lane`);
 }
 console.log('Defense moves inside to block bump-only attackers returning from neutral');
+// Identical field states must produce identical scoring controls and outcomes
+// regardless of defensive difficulty, including crossing and intake approach.
+const sameScorers=['easy','medium','hard'].map(()=>{const s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('341'),resolve('316','red')]);s.start();s.time=33;s.autoWinner='blue';return s;});
+for(let i=0;i<18*120;i++){
+ const controls=sameScorers.map((s,k)=>defenderInput(s,['easy','medium','hard'][k]));
+ assert.deepEqual(controls[0],controls[1],'easy and medium scoring inputs must match');assert.deepEqual(controls[1],controls[2],'medium and hard scoring inputs must match');
+ sameScorers.forEach((s,k)=>s.step(1/120,[{},controls[k]]));
+}
+assert.equal(sameScorers[0].scores.red,sameScorers[2].scores.red,'scoring outcome is identical');
+console.log('All difficulty levels share identical scoring controls and team');
