@@ -164,3 +164,14 @@ for(const alliance of ['blue','red']){
  s.balls=[];s.time+=.6;const guardAgain=defenderInput(s,'hard');assert(Math.abs(guardAgain.moveX||0)<.1,`${alliance} AI should return to bump when fuel runs low`);
 }
 console.log('AI switches between bump and zonal defense based on opponent-zone fuel');
+// A bump-only attacker outside its zone during its active shift must find the
+// defender on the alliance side of its chosen bump when it returns.
+for(const alliance of ['blue','red'])for(const y of [2.51,5.56]){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('8513',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;s.balls=[];
+ Object.assign(s.fleet[0].robot,{x:alliance==='blue'?8:8.54,y,a:0,vx:0,vy:0});Object.assign(s.fleet[1].robot,{x:alliance==='blue'?6.3:10.24,y,a:0,vx:0,vy:0});
+ for(let i=0;i<3*120;i++)s.step(1/120,[{},defenderInput(s,'hard')]);
+ const x=s.fleet[1].robot.x;
+ assert(alliance==='blue'?x<4.03:x>16.54-4.03,`${alliance} defender should reach inside of bump y=${y}, x=${x}`);
+ assert(Math.abs(s.fleet[1].robot.y-y)<.8,`${alliance} defender should block chosen bump lane`);
+}
+console.log('Defense moves inside to block bump-only attackers returning from neutral');
