@@ -14,7 +14,7 @@ export function defenderInput(sim, difficulty='medium') {
     return {moveX:dx/distance*throttle,moveY:dy/distance*throttle,turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake};
   };
   const red=defender.config.alliance==='red',home=red?r.x>=16.54-4.03:r.x<=4.03;
-  const scoring=sim.phase.id==='auto'||(sim.phase.id!=='endgame'&&sim.activeAt(defender.config.alliance));
+  const scoring=sim.phase.id==='auto'||sim.activeAt(defender.config.alliance);
   if(scoring){
     let state=scoringState.get(sim);
     if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null};scoringState.set(sim,state);}
