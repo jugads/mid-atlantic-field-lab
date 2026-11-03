@@ -24,7 +24,7 @@ const returning=makeSim();returning.time=34;returning.autoWinner='blue';const en
 Object.assign(entry.robot,{x:7,y:4,a:0});entry.inventory=entry.state.inventory=20;advance(returning,15);
 assert(returning.scores.red>0,'AI crosses the field and scores on its active shift');
 console.log('Defender scoring cycle and return checks passed');
-const endgame=makeSim();endgame.time=140;const defend=defenderInput(endgame,'medium');assert(!defend.shoot&&Math.hypot(defend.moveX||0,defend.moveY||0)>0,'AI may defend in endgame');
+const endgame=makeSim();endgame.time=140;const endgameInput=defenderInput(endgame,'medium');assert(endgameInput.shoot,'AI scores its preload during endgame');
 const neutral=makeSim();neutral.time=40;neutral.autoWinner='blue';neutral.balls=[{x:10,y:.69,z:.075}];const enemy=neutral.fleet[1];enemy.inventory=enemy.state.inventory=0;Object.assign(enemy.robot,{x:13.6,y:.69,a:Math.PI});
 const seek=defenderInput(neutral,'medium');assert(seek.moveX<0&&seek.intake,'AI heads through the trench for neutral-zone fuel');
 console.log('Defender endgame and neutral fuel checks passed');
