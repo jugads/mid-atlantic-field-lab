@@ -48,3 +48,7 @@ for(const s of [solo3,room3]){assert.equal(s.fleet.length,6);assert.equal(s.flee
 const {matchInputs}=await import('../dist/multiplayer.js');solo3.start();const ci=matchInputs(solo3,[{}]);assert.equal(ci.length,6);assert(ci.slice(1).every(c=>typeof c==='object'));
 const host3=new MultiplayerClient(()=>{});host3.id='a';host3.state='connected';host3.room={mode:'3v3',players:[{id:'a',team:'341',alliance:'blue'},{id:'b',team:'708',alliance:'red'}],status:'playing',hostId:'a'};host3.hostSim=room3;const messages3=[];host3.send=m=>messages3.push(m);host3.advanceHost(1000,{});host3.advanceHost(1100,{});assert(messages3.some(m=>m.type==='snapshot'&&m.fleet.length===6));assert(JSON.stringify(messages3.at(-1)).length<65536);
 console.log('PASS 3v3 rosters, AI controls and snapshots');
+const configured = createHostSimulation({mode:'3v3',players:[{team:'341',alliance:'blue',aiTeams:['316','708']},{team:'5895',alliance:'red',aiTeams:['1391','9094']}]});
+assert.deepEqual(configured.fleet.map(e=>e.config.team),['341','5895','316','708','1391','9094']);
+const configuredSolo = createHostSimulation({mode:'3v3solo',players:[{team:'341',alliance:'blue'}],aiTeams:{blue:['316','708'],red:['1391','9094','5895']}});
+assert.deepEqual(configuredSolo.fleet.map(e=>e.config.team),['341','316','708','1391','9094','5895']);

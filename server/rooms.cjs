@@ -11,7 +11,7 @@ class Rooms{
   send(socket,data){if(socket?.readyState===1&&socket.bufferedAmount<512000)socket.send(JSON.stringify(data));}
   fail(socket,message){this.send(socket,{type:'error',message});}
   lobby(room){return {type:'room',protocol:2,code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,hostId:room.hostId,stalled:!!room.stalled,
-    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
+    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,aiTeams:p.aiTeams,ready:p.ready,connected:!!p.socket,alliance:room.mode==='coop'||index===0?'blue':'red'}))};}
   broadcast(room,message=this.lobby(room)){for(const p of room.players)this.send(p.socket,message);}
   welcome(room,p){this.send(p.socket,{type:'welcome',protocol:2,id:p.id,token:p.token,code:room.code});this.broadcast(room);if(room.snapshot&&p.id!==room.hostId)this.send(p.socket,room.snapshot);}
   handle(socket,msg){
@@ -39,7 +39,7 @@ class Rooms{
         if(room.players.length>=2)return this.fail(socket,'This room already has two players.');
         if(room.status!=='lobby')return this.fail(socket,'This match has already started.');
       }
-      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team:typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341',ready:false,socket};
+      const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team:typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341',aiTeams:['2539','2539'],ready:false,socket};
       room.players.push(p);if(!room.hostId)room.hostId=p.id;socket.room=room;socket.player=p;this.welcome(room,p);return;
     }
     const room=socket.room,p=socket.player;if(!room||!p)return this.fail(socket,'Join a room first.');
@@ -62,6 +62,11 @@ class Rooms{
       if(room.status!=='lobby')return this.fail(socket,'Robot selection is locked during a match.');
       if(!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Unknown robot.');
       p.team=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
+    }
+    if(msg.type==='select_ai'){
+      if(room.status!=='lobby'||room.mode!=='3v3')return this.fail(socket,'AI selection is available in a 3v3 lobby.');
+      if(!Number.isInteger(msg.slot)||msg.slot<0||msg.slot>1||typeof msg.team!=='string'||!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Invalid AI selection.');
+      p.aiTeams[msg.slot]=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='ready'){
       if(room.status!=='lobby')return;

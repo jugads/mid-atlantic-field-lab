@@ -6,7 +6,7 @@ export function createHostSimulation(room){
   const size=room.mode==='3v3'||room.mode==='3v3solo'?3:room.mode==='2v2'?2:0;
   if(size)for(const alliance of ['blue','red']){
     const count=roster.filter(r=>r.alliance===alliance).length;
-    for(let i=count;i<size;i++)roster.push({...resolve('2539',alliance),intakeDirection:'front'});
+    for(let i=count;i<size;i++){const owner=room.players.find(p=>p.alliance===alliance),chosen=room.aiTeams?.[alliance]?.[i-count]??owner?.aiTeams?.[i-count]??'2539'; roster.push(resolve(chosen,alliance));}
   }
   const sim=new Simulation();sim.enableMultiplayer(roster);return sim;
 }

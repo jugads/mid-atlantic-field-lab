@@ -27,3 +27,5 @@
 .foul-display{position:absolute;top:100px;left:50%;transform:translateX(-50%);display:flex;align-items:center;flex-direction:column;gap:3px;color:#f1d1ff;font-size:11px;font-weight:700;pointer-events:none;text-shadow:0 1px 4px #000}.foul-display span:empty{display:none}
 
 .auto-result{grid-column:1/-1;text-align:center;padding:5px;color:#f4e8ff;font-size:10px;font-weight:700;letter-spacing:.4px}.auto-result[hidden]{display:none}
+
+.ai-selections{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin:.7rem 0}.ai-selections[hidden]{display:none}.ai-selections strong{width:100%;font-size:.85rem}.ai-selections label{display:flex;align-items:center;gap:.35rem;font-size:.75rem}.ai-selections select{max-width:190px}
