@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 // Load the browser module without imposing ESM on the CommonJS server.
 const code=await readFile(new URL('../dist/defender.js',import.meta.url),'utf8');
-const {defenderInput}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {defenderInput,defenderTeam}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 const player={x:6,y:4,vx:1,vy:0},robot={x:13,y:4,a:Math.PI};
 const bot={robot,config:{alliance:'red',length:.8762,width:.8262,capacity:40},inventory:8};
 const sim={fleet:[{robot:player},bot],phase:{id:'auto'},activeAt:()=>true,balls:[]};
@@ -83,3 +83,18 @@ Object.assign(jam.fleet[0].robot,{x:4.7,y:.69,a:0,vx:0,vy:0});Object.assign(jam.
 let reachedBump=false;for(let i=0;i<4*120;i++){jam.step(1/120,[{},defenderInput(jam,'medium')]);if(jam.fleet[1].robot.y>2.1)reachedBump=true;}
 assert(reachedBump,'AI escapes a blocked trench and routes through the bump lane');
 console.log('AI escapes a blocked trench via the bump');
+// A full hard-mode shift should complete three collection/shooting cycles
+// while still leaving the last five seconds for defense.
+assert.equal(defenderTeam('hard'),'316');
+assert.equal(defenderTeam('medium'),'2539');
+const hardShift=new Simulation({},()=>.5);hardShift.enableMultiplayer([resolve('341'),resolve('316','red')]);hardShift.start();hardShift.time=33;hardShift.autoWinner='blue';
+let bursts=0,shooting=false;
+for(let i=0;i<20*120;i++){
+ const input=defenderInput(hardShift,'hard');
+ if(input.shoot&&!shooting)bursts++;
+ shooting=!!input.shoot;
+ hardShift.step(1/120,[{},input]);
+}
+assert(bursts>=3,`hard 316 should shoot three loads in its shift, got ${bursts}`);
+assert(hardShift.scores.red>=75,`hard 316 should score substantially during its shift, got ${hardShift.scores.red}`);
+console.log('Hard team 316 completes three scoring cycles before defense');
