@@ -21,7 +21,8 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     if(!state||sim.time<state.lastTime){state={collecting:false,since:sim.time,target:null,blocked:new WeakMap(),lane:null,routeHome:null};states.set(botIndex,state);}
     state.lastTime=sim.time;
     if(defender.inventory===0&&!state.collecting){state.collecting=true;state.since=sim.time;state.target=null;}
-    if(state.collecting&&(defender.inventory>=Math.min(10,defender.config.capacity)||sim.time-state.since>5&&defender.inventory>0)){state.collecting=false;state.target=null;state.lane=null;}
+    // Fill the hopper before shooting; leave time to score before the shift ends.
+    if(state.collecting&&(defender.inventory>=defender.config.capacity||(defender.inventory>0&&Number.isFinite(sim.phaseRemaining)&&sim.phaseRemaining<=5))){state.collecting=false;state.target=null;state.lane=null;}
     const crossTrench=(towardHome)=>{
       if(state.lane===null||state.routeHome!==towardHome){state.lane=r.y<8.07/2?.69:8.07-.69;state.routeHome=towardHome;}
       const lane=state.lane;
@@ -49,10 +50,16 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       else{state.targetDistance=distance;state.targetSince=sim.time;}
     }
     if(!state.target){
-      let closest=Infinity;
-      for(const b of sim.balls){if(!eligible(b)||(state.blocked.get(b)||0)>sim.time)continue;
-        const distance=Math.hypot(b.x-r.x,b.y-r.y);
-        if(distance<closest){closest=distance;state.target=b;}}
+      // Score nearby clusters by available fuel and travel distance. Spatial
+      // buckets make this linear in the number of balls rather than quadratic.
+      const cell=1,available=sim.balls.filter(b=>eligible(b)&&(state.blocked.get(b)||0)<=sim.time),buckets=new Map();
+      const key=(x,y)=>`${x},${y}`;
+      for(const b of available){const x=Math.floor(b.x/cell),y=Math.floor(b.y/cell),k=key(x,y);buckets.set(k,(buckets.get(k)||0)+1);}
+      let best=-Infinity,closest=Infinity;
+      for(const b of available){const x=Math.floor(b.x/cell),y=Math.floor(b.y/cell);let count=0;
+        for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)count+=buckets.get(key(x+dx,y+dy))||0;
+        const distance=Math.hypot(b.x-r.x,b.y-r.y),score=Math.min(defender.config.capacity-defender.inventory,count)/(1+.6*distance);
+        if(score>best||(score===best&&distance<closest)){best=score;closest=distance;state.target=b;}}
       state.targetSince=sim.time;state.targetDistance=closest;
     }
     const ball=state.target;
