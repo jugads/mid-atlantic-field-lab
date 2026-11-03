@@ -174,7 +174,9 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
   const pin=sim.pinCounts?.find(p=>p.attacker===botIndex&&p.victim===opponentIndex);
   if(pin&&pin.elapsed>=2.1)ds.backoffUntil=Math.max(ds.backoffUntil,sim.time+1);
   if(sim.time<ds.backoffUntil)return {moveX:dx/distance,moveY:dy/distance};
-  const hubX=player.x<8.27?4.03+1.194/2:16.54-4.03-1.194/2;
+  const enemy=sim.fleet[opponentIndex].config;
+  const enemyBlue=enemy?.alliance?enemy.alliance==='blue':player.x<8.27;
+  const hubX=enemyBlue?4.03+1.194/2:16.54-4.03-1.194/2;
   const inTrench=Math.abs(r.x-hubX)<1.3&&(r.y<1.4||r.y>8.07-1.4);
   if(inTrench&&distance<2&&Math.hypot(r.vx,r.vy)<.35){if(ds.stuckSince===null)ds.stuckSince=sim.time;}
   else ds.stuckSince=null;
@@ -187,7 +189,6 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     if(path.stage===1){if(Math.abs(r.y-path.lane)>.25)return driveTo(path.entry,path.lane,false,1);path.stage=2;}
     if(path.stage===2){if(Math.abs(r.x-path.exit)>.3)return driveTo(path.exit,path.lane,false,1);ds.bypass=null;}
   }
-  const enemy=sim.fleet[opponentIndex].config;
   const bumpOnly=enemy&&(enemy.height>.5652||enemy.width>1.30);
   // Defend the scoring zone when it has enough loose fuel for the opponent;
   // otherwise protect the bump to interrupt their next neutral-zone trip.
@@ -197,8 +198,23 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     ds.zoneDefense=ds.zoneDefense?count>=12:count>=20;ds.zoneCheckedAt=sim.time;
   }
   const enemyHome=enemy&&(enemy.alliance==='blue'?player.x<=4.03:player.x>=16.54-4.03);
+  const returningOpponent=bumpOnly&&!enemyHome&&sim.activeAt(enemy.alliance);
+  if(returningOpponent){
+    // Guard the home side of the bump while the opponent is outside, so it
+    // must fight through the defender to return and shoot.
+    const direction=enemyBlue?1:-1,predictedY=player.y+(player.vy||0)*.35;
+    const lane=predictedY<8.07/2?2.51:8.07-2.51;
+    const targetY=Math.max(lane-.5,Math.min(lane+.5,predictedY));
+    const insideX=hubX-direction*1.25,entryX=hubX+direction*1.35;
+    const onNeutralSide=(r.x-hubX)*direction>.3;
+    if(onNeutralSide&&Math.abs(r.y-lane)>.3){
+      const entryClear=(r.x-hubX)*direction>1.2;
+      return driveTo(entryClear?entryX:r.x,lane,false,hard?1:defenseSpeed);
+    }
+    return driveTo(insideX,targetY,false,hard?1:defenseSpeed);
+  }
   if(bumpOnly&&!(ds.zoneDefense&&enemyHome)&&Math.abs(player.x-hubX)<2.7){
-    const direction=player.x<8.27?1:-1;
+    const direction=enemyBlue?1:-1;
     // Keep the simpler, forgiving bump block on easy and medium.
     if(!hard){
       const side=player.y<8.07/2?2.51:8.07-2.51;
