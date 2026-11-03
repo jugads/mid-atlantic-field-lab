@@ -1,5 +1,5 @@
-import {defenderInput} from './defender.js?v=capacity1';
-import {MultiplayerClient} from './multiplayer.js?v=capacity1';
+import {defenderInput} from './defender.js?v=trench2';
+import {MultiplayerClient} from './multiplayer.js?v=trench2';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;

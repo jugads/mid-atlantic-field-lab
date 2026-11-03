@@ -30,7 +30,8 @@ const four=createHostSimulation(room2);assert.equal(four.fleet.length,4);assert.
 assert.equal(four.fleet.reduce((n,e)=>n+e.inventory,0),32);assert.equal(four.initialCenterCount,376);
 const host2=new MultiplayerClient(()=>{});host2.id='a';host2.state='connected';host2.room={...room2,status:'playing',hostId:'a'};host2.hostSim=four;
 const messages=[];host2.send=m=>messages.push(m);host2.guestInput={moveX:-1};host2.guestInputAt=1000;
+const botStarts=four.fleet.slice(2).map(e=>({...e.robot}));
 host2.advanceHost(1000,{});host2.advanceHost(1100,{});assert(messages.some(m=>m.type==='snapshot'&&m.fleet.length===4));
-assert(four.fleet[2].inventory<8||four.fleet[3].inventory<8||four.fleet[2].robot.a!==0||four.fleet[3].robot.a!==Math.PI,'bots receive independent inputs');
+assert(four.fleet.slice(2).some((e,i)=>e.inventory<8||Math.hypot(e.robot.x-botStarts[i].x,e.robot.y-botStarts[i].y)>.001||Math.abs(e.robot.a-botStarts[i].a)>.001),'bots receive independent inputs');
 assert(JSON.stringify(messages.at(-1)).length<65536,'four-robot snapshot fits relay payload limit');
 console.log('PASS 2v2 host simulates and publishes four robots');
