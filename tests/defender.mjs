@@ -136,3 +136,11 @@ const tracking=defenderInput(agile,'hard');assert(tracking.moveY>.7,'hard bump d
 Object.assign(agile.fleet[0].robot,{x:5.4,y:2.51,vx:1,vy:0});Object.assign(agile.fleet[1].robot,{x:7,y:2.51});
 const afterCross=defenderInput(agile,'hard');assert(afterCross.moveX<-.8,'hard defense chases once attacker has crossed the bump');
 console.log('Hard bump defense tracks and responds after a crossing');
+// Sustained defense should disrupt aim without towing a stationary opponent.
+const controlledContact=new Simulation({},()=>.5);controlledContact.enableMultiplayer([resolve('316','blue'),resolve('316','red')]);controlledContact.start();controlledContact.time=40;controlledContact.autoWinner='red';controlledContact.balls=[];
+Object.assign(controlledContact.fleet[0].robot,{x:7,y:4,a:0,vx:0,vy:0});Object.assign(controlledContact.fleet[1].robot,{x:9,y:4,a:Math.PI,vx:0,vy:0});
+let contactSpin=0;for(let i=0;i<8*120;i++){controlledContact.step(1/120,[{},defenderInput(controlledContact,'hard')]);contactSpin=Math.max(contactSpin,Math.abs(controlledContact.fleet[0].robot.impactOmega||0));}
+const moved=Math.hypot(controlledContact.fleet[0].robot.x-7,controlledContact.fleet[0].robot.y-4);
+assert(moved<2,`stationary player should not be pushed across the field: ${moved}m`);
+assert(contactSpin>.3,'controlled defense still creates an off-center turning impact');
+console.log('Hard defense controls sustained pushing while disrupting aim');
