@@ -176,9 +176,27 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
   const enemy=sim.fleet[opponentIndex].config;
   const bumpOnly=enemy&&(enemy.height>.5652||enemy.width>1.30);
   if(bumpOnly&&Math.abs(player.x-hubX)<2.7){
-    const side=player.y<8.07/2?2.51:8.07-2.51;
-    const blockX=hubX+(player.x<8.27?1:-1)*1.1;
-    return driveTo(blockX,side,false,.95);
+    const direction=player.x<8.27?1:-1;
+    // Keep the simpler, forgiving bump block on easy and medium.
+    if(!hard){
+      const side=player.y<8.07/2?2.51:8.07-2.51;
+      return driveTo(hubX+direction*1.1,side,false,.95);
+    }
+    // Intercept only while the opponent is approaching its bump. Once it has
+    // crossed, pursue its corner instead of guarding an empty lane behind it.
+    if((player.x-hubX)*direction<.35){
+      const predictedY=player.y+(player.vy||0)*.45;
+      const lane=predictedY<8.07/2?2.51:8.07-2.51;
+      const targetY=Math.max(lane-.62,Math.min(lane+.62,predictedY));
+      const targetX=hubX+direction*.95;
+      const bx=targetX-r.x,by=targetY-r.y,range=Math.hypot(bx,by);
+      if(range<.035)return {intake:false};
+      // React at full speed until nearly in position, including lateral changes
+      // within the lane; braking still comes from the normal robot physics.
+      const throttle=Math.min(1,range*3.5),heading=Math.atan2(by,bx);
+      const error=Math.atan2(Math.sin(heading-r.a),Math.cos(heading-r.a));
+      return {moveX:bx/range*throttle,moveY:by/range*throttle,turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake:false};
+    }
   }
   // Pursuit must route around the opponent hub and divider even when the
   // player is far away; a straight line into the hub wastes an entire shift.

@@ -1,4 +1,4 @@
-import {defenderInput,defenderTeam} from './defender.js?v=pressure4';
+import {defenderInput,defenderTeam} from './defender.js?v=bump5';
 import {MultiplayerClient} from './multiplayer.js?v=pin1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
