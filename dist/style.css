@@ -21,3 +21,5 @@
 @media(max-width:700px){#roomConnect{grid-template-columns:1fr;gap:12px}.room-code-line{gap:8px;flex-wrap:wrap}#roomPlayers{flex-direction:column}#connectionBadge{display:none}.play-tabs button{font-size:10px}}
 
 #networkMessage:empty{display:none}.picker.room-mode{padding:18px}.room-mode .picker-heading h1{font-size:29px}.room-mode .picker-heading p:not(.eyebrow),.room-mode .picker-count{display:none}.room-mode .eyebrow{margin-top:0;margin-bottom:4px}.room-mode .play-tabs{margin-top:10px}.room-mode .robot-choices{margin:12px 0}.room-mode .robot-choice{padding:12px}.room-mode .robot-choice.selected{padding:11px}.room-mode .robot-choice strong{min-height:0;font-size:11px}.room-mode .choice-stats{margin-top:8px;padding-top:8px}.room-mode .choice-details{margin-top:8px}.room-mode .start-details{margin:10px 0}
+
+.defender-option{display:flex;align-items:center;gap:9px;margin:12px 0;color:#eee;font-size:13px;cursor:pointer}.defender-option input{accent-color:#a779d2}.defender-option span{color:#a99bb6;font-size:12px}.defender-option[hidden]{display:none}

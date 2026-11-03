@@ -1,3 +1,4 @@
+import {defenderInput} from './defender.js?v=1';
 import {MultiplayerClient} from './multiplayer.js?v=stable1';
 import {FieldView} from './view3d.js?v=nonet1';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
@@ -10,7 +11,7 @@ let selectedTeam='341',keys=new Set(),last=0,accumulator=0,suppressGamepadShoot=
 
 function selectRobot(team){
   if(sim.started||countdown.active||!profiles[team]||online.active&&online.room.status!=='lobby')return;
-  selectedTeam=team;sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
+  selectedTeam=team;if(!online.active){sim.multiplayer=false;sim.activeIndex=0;sim.roster=[resolvePreset(team)];}sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
   const moveFocus=document.activeElement?.classList.contains('robot-choice');
   for(const button of $('robotChoices').children){const active=button.dataset.team===team;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));if(active&&moveFocus)button.focus();}
   $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;
@@ -31,7 +32,7 @@ function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.tea
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
-$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
+$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),resolvePreset('2539','red')]);countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
 $('pause').onclick=togglePause;$('reset').onclick=reset;
 $('help').onclick=()=>{if(!online.active&&(sim.running||countdown.running))togglePause();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
 const used=['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight','Space','ShiftLeft','KeyP','KeyR'];
@@ -115,7 +116,7 @@ function frame(now){
    sim.intake=sim.controlsEnabled&&!!input.intake;
    let matchDt=dt;
    if(countdown.active){matchDt=0;if(!document.hidden&&countdown.advance(elapsed)){sim.start();keys.clear();accumulator=0;updateMatch();}}
-   if(sim.running&&!document.hidden){accumulator+=matchDt;while(accumulator>=1/120){sim.step(1/120,input);accumulator-=1/120;}}else accumulator=0;
+   if(sim.running&&!document.hidden){accumulator+=matchDt;while(accumulator>=1/120){sim.step(1/120,sim.multiplayer?[input,defenderInput(sim.fleet[1].robot,sim.fleet[0].robot,$('defenderDifficulty').value)]:input);accumulator-=1/120;}}else accumulator=0;
  }
  draw();requestAnimationFrame(frame);
 }
@@ -148,7 +149,7 @@ function networkChanged(msg){
 function setOnlineMode(value){
  if(online.active)return;
  if(!value&&online.state==='connecting')online.leave(false);
- onlineMode=value;$('picker').classList.toggle('room-mode',value);$('onlinePanel').hidden=!value;$('soloTab').setAttribute('aria-pressed',String(!value));$('onlineTab').setAttribute('aria-pressed',String(value));
+ onlineMode=value;$('defenderOption').hidden=value;$('defenderDifficultyOption').hidden=value||!$('aiDefender').checked;$('picker').classList.toggle('room-mode',value);$('onlinePanel').hidden=!value;$('soloTab').setAttribute('aria-pressed',String(!value));$('onlineTab').setAttribute('aria-pressed',String(value));
  updateMatch();
 }
 function connectRoom(type){
@@ -158,6 +159,7 @@ function connectRoom(type){
  try{localStorage.setItem('fieldLabServer',endpoint);}catch{}
  online.connect(endpoint,{type,mode:$('roomMode').value,code:$('roomCodeInput').value.trim().toUpperCase(),team:selectedTeam});
 }
+$('aiDefender').onchange=()=>$('defenderDifficultyOption').hidden=onlineMode||!$('aiDefender').checked;
 $('soloTab').onclick=()=>setOnlineMode(false);$('onlineTab').onclick=()=>setOnlineMode(true);
 $('createRoom').onclick=()=>connectRoom('create');$('joinRoom').onclick=()=>connectRoom('join');
 $('leaveRoom').onclick=()=>{online.leave();keys.clear();networkChanged();};
