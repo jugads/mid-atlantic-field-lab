@@ -89,7 +89,7 @@ test('releasing drive controls applies strong braking without changing accelerat
 });
 test('user-supplied team builds resolve with the requested specifications',()=>{
  const p341=resolvePreset('341'),p316=resolvePreset('316'),p1391=resolvePreset('1391'),p8513=resolvePreset('8513');
- assert.equal(Object.keys(profiles).length,7);
+ assert.equal(Object.keys(profiles).length,8);
  assert.equal(p341.capacity,8);assert.equal(p341.archetype,'turret');assert.equal(p341.height,.4);
  assert.equal(p341.feedRate,10);assert.equal(p341.intakeRate,15);assert(p341.moving>=85);
  assert.equal(p316.capacity,50);assert(p316.height<FIELD.trenchClearance);assert.equal(p316.archetype,'dumper');assert.equal(p316.feedRate,25);assert.equal(p316.lanes,3);assert.equal(p316.intakeRate,32);assert.equal(p316.moving,75);
@@ -101,10 +101,15 @@ test('user-supplied team builds resolve with the requested specifications',()=>{
 });
 test('5895 has two corner turrets, 40 total capacity and fits the trench',()=>{
  const c=resolvePreset('5895');assert.equal(c.archetype,'double_turret');assert.equal(c.capacity,40);assert.equal(c.moving,80);assert(canUseTrench(c));
+ assert.equal(c.width,.8262);assert.equal(c.length,.8762);
  assert.equal(c.feedRate,14);assert.equal(c.intakeRate,32);const s=empty({...c,autoAim:true,stationary:100,moving:100});
  s.turretAngle=s.aimAngle;s.inventory=2;assert.equal(s.fire(1),1);assert.equal(s.fire(1),1);
  const [a,b]=s.balls;assert(Math.hypot(a.x-b.x,a.y-b.y)>.4,'shots originate at separate corners');
  assert.equal(s.nextTurret,0);assert.equal(s.fired,2);
+});
+test('2539 is a trench-compatible 40-fuel dumper with the enlarged 5895 footprint',()=>{
+ const c=resolvePreset('2539'),p=resolvePreset('5895');assert.equal(c.archetype,'dumper');assert.equal(c.capacity,40);assert.equal(c.feedRate,20);assert.equal(c.intakeRate,30);
+ assert.equal(c.width,p.width);assert.equal(c.length,p.length);assert(canUseTrench(c));
 });
 test('5895 fills comfortably driving full speed through center fuel',()=>{
  const s=new Simulation(resolvePreset('5895'),()=>.5);Object.assign(s.robot,{x:W/2-2,y:H/2+1,a:0,vx:5,vy:0});s.start();s.intake=true;
