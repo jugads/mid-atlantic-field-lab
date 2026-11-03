@@ -89,3 +89,16 @@ test('complete two-player match conserves fuel and ends for both drivers',()=>{
  const s=fleet('coop');s.start();advance(s,166,[{shoot:true},{shoot:true}]);assert.equal(s.phase.id,'finished');assert(!s.running);assert.equal(total(s),504);assert(s.fleet.every(e=>e.robot.vx===0&&e.robot.vy===0));
 });
 console.log(`${passed} multiplayer tests passed.`);
+test('off-center bumper impact spins a shooting robot and the chassis continues turning',()=>{
+ const s=fleet('coop');s.balls=[];const [a,b]=s.fleet;
+ Object.assign(a.robot,{x:7,y:4.35,a:0,vx:4,vy:0,omega:0,impactOmega:0});
+ Object.assign(b.robot,{x:7.8,y:4,a:0,vx:0,vy:0,omega:0,impactOmega:0});
+ s.loadDriver(0);s.resolveRobot();assert(Math.abs(b.robot.impactOmega)>.1,'off-center hit transfers angular momentum');
+ const before=b.robot.a;s.start();advance(s,.1,[{},{shoot:true}]);assert(Math.abs(b.robot.a-before)>.01,'impact rotates robot even under aim control');
+});
+test('centered bumper impact produces no significant spin',()=>{
+ const s=fleet('coop');s.balls=[];const [a,b]=s.fleet;
+ Object.assign(a.robot,{x:7,y:4,a:0,vx:4,vy:0,omega:0,impactOmega:0});
+ Object.assign(b.robot,{x:7.8,y:4,a:0,vx:0,vy:0,omega:0,impactOmega:0});
+ s.loadDriver(0);s.resolveRobot();assert(Math.abs(b.robot.impactOmega)<1e-8);
+});
