@@ -195,3 +195,19 @@ for(const alliance of ['blue','red'])for(const y of [2.51,5.56])for(const homeSi
  s.pinCounts=[{attacker:1,victim:0,elapsed:2.2}];const release=defenderInput(s,'hard');assert(release.moveX*homeSide<0,'pin release overrides bump pressure');
 }
 console.log('Defense actively meets approaching bump robots on both sides');
+// Exercise real bump collisions against a player continuously driving through
+// from either side. The defender should hold near the bump, not merely issue
+// a command toward an opponent that rolls straight past.
+for(const alliance of ['blue','red'])for(const y of [2.51,5.56])for(const dir of [-1,1]){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('708',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;s.balls=[];
+ const hub=alliance==='blue'?4.627:11.913;
+ Object.assign(s.fleet[0].robot,{x:hub-dir*1.35,y,a:0,vx:0,vy:0});Object.assign(s.fleet[1].robot,{x:hub+dir*.95,y,a:0,vx:0,vy:0});
+ let furthest=-Infinity;for(let i=0;i<3*120;i++){s.step(1/120,[{moveX:dir},defenderInput(s,'hard')]);furthest=Math.max(furthest,(s.fleet[0].robot.x-hub)*dir);}
+ assert(furthest<.7,`${alliance} attacker crossed bump y=${y} direction=${dir}: ${furthest.toFixed(2)}m`);
+}
+for(const alliance of ['blue','red']){
+ const other=alliance==='blue'?'red':'blue',s=new Simulation({},()=>.5);s.enableMultiplayer([resolve('708',alliance),resolve('316',other)]);s.start();s.time=40;s.autoWinner=other;s.balls=[];const hub=alliance==='blue'?4.627:11.913;
+ Object.assign(s.fleet[0].robot,{x:hub+(alliance==='blue'?-1.3:1.3),y:5.56,a:0,vx:0,vy:0});Object.assign(s.fleet[1].robot,{x:hub+(alliance==='blue'?.95:-.95),y:2.51,a:0,vx:0,vy:0});
+ for(let i=0;i<3*120;i++)s.step(1/120,[{},defenderInput(s,'hard')]);assert(s.fleet[1].robot.y>5,`${alliance} defender must move around hub to other bump`);
+}
+console.log('Hard defense contests bump crossings and switches lanes');
