@@ -12,7 +12,7 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
     const angle=Math.atan2(dy,dx),error=Math.atan2(Math.sin(angle-r.a),Math.cos(angle-r.a));
     // Align the intake before driving into fuel, otherwise swerve motion pushes it away.
     const approach=speed===1?Math.min(1,Math.max(.2,distance*.9)):1;
-    const throttle=alignIntake&&Math.abs(error)>.4?0:speed*approach;
+    const throttle=alignIntake&&Math.abs(error)>.4?(hard?speed*.75:0):speed*approach;
     return {moveX:dx/distance*throttle,moveY:dy/distance*throttle,turnAxis:Math.max(-1,Math.min(1,error*1.5)),intake};
   };
   const red=defender.config.alliance==='red',home=red?r.x>=16.54-4.03:r.x<=4.03;
@@ -68,10 +68,24 @@ export function defenderInput(sim, difficulty='medium', botIndex=1, opponentInde
       }
       const passed=dir>0?r.x>=route.exit-.10:r.x<=route.exit+.10;
       if(passed){state.route=null;return null;}
-      // First get fully clear of the hub before strafing into the lane.
+      // Approach diagonally at full speed and start the short trench turn
+      // during the approach, rather than braking at an intermediate waypoint.
       const entryClear=dir>0?r.x<=route.entry+.12:r.x>=route.entry-.12;
-      if(!entryClear&&Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,r.y,true,1);
-      if(Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,route.lane,true,1);
+      if(hard){
+        const dy=route.lane-r.y,laneError=Math.abs(dy),trench=route.lane<1||route.lane>7;
+        const e0=Math.atan2(Math.sin(-r.a),Math.cos(-r.a)),e1=Math.atan2(Math.sin(Math.PI-r.a),Math.cos(Math.PI-r.a));
+        const error=Math.abs(e0)<Math.abs(e1)?e0:e1;
+        if(!entryClear&&laneError>(trench?.23:.4))return {moveX:-dir,moveY:0,turnAxis:trench?Math.max(-1,Math.min(1,error*2)):0,intake:true};
+        if(laneError>(trench?.16:.3)){
+          // Advance only as far as the safe entrance until the lane is clear.
+          const advance=Math.max(0,Math.min(1,(dir*(route.entry-r.x)+.20)*2));
+          const vx=dir*advance,vy=Math.max(-1,Math.min(1,dy*2.5)),len=Math.hypot(vx,vy)||1;
+          return {moveX:vx/len,moveY:vy/len,turnAxis:trench?Math.max(-1,Math.min(1,error*2)):0,intake:true};
+        }
+      }else{
+        if(!entryClear&&Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,r.y,true,1);
+        if(Math.abs(r.y-route.lane)>.13)return driveTo(route.entry,route.lane,true,1);
+      }
       // Swerve can cross in either orientation. Turn toward whichever is
       // closer while moving; bump lanes have enough width to keep heading.
       const isTrench=route.lane<1||route.lane>7;
