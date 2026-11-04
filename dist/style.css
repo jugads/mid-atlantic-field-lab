@@ -49,3 +49,5 @@
 
 /* Keep the AUTO result below the timeline and its two messages on separate lines. */
 .auto-result{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 12px;margin:0 -15px;padding:7px 12px 9px;border-top:1px solid #78658a55;line-height:1.3;letter-spacing:.2px}.auto-result strong{font-size:11px}.auto-result span{font-size:9px;font-weight:500;color:#cfbfdb}@media(max-width:700px){.auto-result{gap:2px 8px;padding:6px 8px}.auto-result strong{font-size:10px}.auto-result span{font-size:8px}}
+
+.foul-display{position:static;transform:none;grid-column:1/-1;min-width:0;padding:4px 0 6px;font-size:9px;line-height:1.3;text-align:center;text-shadow:none}.foul-display span{max-width:100%;overflow-wrap:anywhere}@media(max-width:700px){.foul-display{font-size:8px}}
