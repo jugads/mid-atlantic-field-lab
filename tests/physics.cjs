@@ -116,12 +116,13 @@ test('5895 fills comfortably driving full speed through center fuel',()=>{
  const s=new Simulation(resolvePreset('5895'),()=>.5);Object.assign(s.robot,{x:W/2-2,y:H/2+1,a:0,vx:5,vy:0});s.start();s.intake=true;
  advance(s,1,{moveX:1});assert(s.inventory>=35,'should nearly fill while crossing the center pile');assert.equal(total(s),504);
 });
-test('316 disables intake only while shooting with fuel and moving',()=>{
- const c=resolvePreset('316'),s=empty(c);s.start();s.inventory=10;
+test('dumpers disable intake only while shooting with fuel and moving',()=>{
+ for(const team of Object.keys(profiles).filter(t=>profiles[t].archetype==='dumper')){const c=resolvePreset(team),s=empty(c);s.start();s.inventory=10;
  s.intake=true;advance(s,.1,{moveY:1,shoot:true});assert(!s.intake);
  s.robot.vx=0;s.robot.vy=0;s.intake=true;advance(s,.01,{shoot:true});assert(s.intake,'stationary shooting can intake');
  s.intake=true;advance(s,.1,{moveY:1});assert(s.intake,'driving without shooting can intake');
- const other=empty(resolvePreset('1391'));other.start();other.intake=true;advance(other,.1,{moveY:1,shoot:true});assert(other.intake);
+ }
+ const other=empty(resolvePreset('9094'));other.start();other.intake=true;advance(other,.1,{moveY:1,shoot:true});assert(other.intake,'turrets may still intake while moving and shooting');
 });
 test('0% SOTM profiles miss while moving but still shoot normally when stationary',()=>{
  for(const team of ['1391','8513']){
