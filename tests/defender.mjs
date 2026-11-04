@@ -231,3 +231,12 @@ console.log('Hard defense anticipates a same-lane return from neutral');
  Object.assign(s.fleet[1].robot,{x:8,y:2});Object.assign(s.fleet[0].robot,{x:3,y:4});
  assert.equal(defenderInput(s,'hard',1,0).shoot,true,'defending turret passes while outside home zone');
 }
+// A defending robot keeps clear of both tower areas during endgame.
+for(const alliance of ['blue','red'])for(const towerSide of ['blue','red']){
+ const enemy=alliance==='blue'?'red':'blue',s=new Simulation();s.enableMultiplayer([resolve('341',enemy),{...resolve('316',alliance),aiRole:'defend'}]);s.start();s.time=140;s.balls=[];
+ const edge=towerSide==='blue'?1:-1,towerX=edge===1?1:15.54;Object.assign(s.fleet[0].robot,{x:towerX,y:4.035,a:0,vx:0,vy:0});
+ Object.assign(s.fleet[1].robot,{x:edge===1?2.7:13.84,y:4.035,a:0,vx:0,vy:0});
+ const cmd=defenderInput(s,'hard',1,0);assert((cmd.moveX||0)*edge>=0,`${alliance} must not drive toward ${towerSide} tower`);
+ for(let i=0;i<2*120;i++)s.step(1/120,[{},defenderInput(s,'hard',1,0)]);
+ assert((s.fleet[1].robot.x-towerX)*edge>1.7,`${alliance} must leave space near ${towerSide} tower`);
+}
