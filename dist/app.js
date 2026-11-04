@@ -1,6 +1,6 @@
-import {defenderInput,defenderTeam} from './defender.js?v=results19';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=results19';
-import {FieldView} from './view3d.js?v=results19';
+import {defenderInput,defenderTeam} from './defender.js?v=auto20';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=auto20';
+import {FieldView} from './view3d.js?v=auto20';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
@@ -85,7 +85,7 @@ function updateMatch(){
  $('phaseLabel').textContent=ready?'READY FOR AUTO':paused?'PAUSED':preparing?'MATCH STARTING':p.label;
  $('matchClock').textContent=formatTime(sim.matchRemaining);
  const auto=$('autoResult');auto.hidden=!sim.started||sim.time<23||sim.time>=33;
- if(!auto.hidden){const b=sim.autoScores.blue,r=sim.autoScores.red;auto.textContent=b===r?`AUTO TIED · BLUE ${b}–${r} RED · ${sim.autoWinner.toUpperCase()} INACTIVE FIRST`:`${sim.autoWinner.toUpperCase()} WON AUTO · BLUE ${b}–${r} RED · INACTIVE FIRST`;}
+ if(!auto.hidden){const b=sim.autoScores.blue,r=sim.autoScores.red,winner=b===r?'AUTO TIED':`${sim.autoWinner.toUpperCase()} WON AUTO`;auto.firstElementChild.textContent=`${winner}  ·  ${b}–${r}`;auto.lastElementChild.textContent=`${sim.autoWinner.toUpperCase()} INACTIVE FIRST`;}
 
  const pin=sim.pinCounts?.find(p=>p.elapsed>0);$('pinNotice').textContent=pin?`${pin.alliance.toUpperCase()} PIN · ${Math.min(3,pin.elapsed).toFixed(1)} / 3s`:'';
  const event=sim.foulEvents?.at(-1);$('foulNotice').textContent=event&&sim.time-event.time<5?`${event.alliance.toUpperCase()} · ${event.rule} · ${event.detail} · +${event.points} to opponent`:'';

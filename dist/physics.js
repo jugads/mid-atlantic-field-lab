@@ -520,8 +520,8 @@
       if(this.controlsEnabled)this.drive(dt,control);else{r.vx=0;r.vy=0;r.omega=0;r.shootingSpeedLimited=false;}
       this.fireClock=Math.max(0,this.fireClock-dt);this.intakeClock=Math.max(-dt,this.intakeClock-dt);
       const wantsFire=control.shoot;
-      // Team 316 cannot run the intake while actively shooting or passing on the move.
-      if(c.disableIntakeWhileMovingShot&&wantsFire&&this.inventory>0&&Math.hypot(r.vx,r.vy)>.15)this.intake=false;
+      // Dumpers cannot run the intake while actively shooting or passing on the move.
+      if(c.archetype==='dumper'&&wantsFire&&this.inventory>0&&Math.hypot(r.vx,r.vy)>.15)this.intake=false;
       if(['turret','double_turret'].includes(c.archetype)&&c.autoAim){
         const error=Math.atan2(Math.sin(this.aimAngle-this.turretAngle),Math.cos(this.aimAngle-this.turretAngle));
         this.turretAngle+=this.aimPID(this.turretController,error,dt)*dt;
