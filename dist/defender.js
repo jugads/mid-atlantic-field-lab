@@ -343,6 +343,21 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
   const home = c.alliance === 'red' ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const hubX = c.alliance === 'red' ? 16.54 - 4.627 : 4.627;
+  // Defenders should not pursue contact into either tower's endgame area.
+  // Keep a robot-width buffer around the structure and steer out if already inside.
+  if (sim.phase.id === 'endgame' && role === 'defend') {
+    const margin = 1.30 + Math.hypot(c.length || .9, c.width || .85) / 2 + 1.05;
+    const band = .83 / 2 + Math.hypot(c.length || .9, c.width || .85) / 2 + .55;
+    const side = r.x < 16.54 / 2 ? 1 : -1, distance = side > 0 ? r.x : 16.54-r.x, lateral = r.y - 8.07 / 2;
+    const mx=input.moveX||0,my=input.moveY||0;
+    if (distance < margin && Math.abs(lateral) < band) {
+      input.moveX=side;input.moveY=Math.abs(lateral) < .05 ? (opponentIndex % 2 ? 1 : -1)*.3 : Math.sign(lateral)*.3;
+    } else if (distance < margin && lateral*my < 0 && Math.abs(lateral) < band+.5) {
+      input.moveY=0;
+    } else if (Math.abs(lateral) < band && distance < margin+.5 && mx*side < 0) {
+      input.moveX=0;
+    }
+  }
   if (!active && home && ['collect','pass'].includes(role)) input.shoot = false;
   else if (role === 'pass' && bot.inventory > 0 && !home) input.shoot = true;
   else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;

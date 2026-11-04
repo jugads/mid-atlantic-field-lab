@@ -1,4 +1,4 @@
-import {defenderInput} from './defender.js?v=strategy17';
+import {defenderInput} from './defender.js?v=results19';
 
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;

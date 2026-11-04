@@ -31,3 +31,18 @@
 .ai-selections{display:flex;flex-wrap:wrap;align-items:center;gap:.55rem;margin:.7rem 0}.ai-selections[hidden]{display:none}.ai-selections strong{width:100%;font-size:.85rem}.ai-selections label{display:flex;align-items:center;gap:.35rem;font-size:.75rem}.ai-selections select{max-width:190px}
 
 #resultsContent p{margin:.35rem 0}#resultsContent h3{margin:1rem 0 .35rem} .ai-selections label{flex-wrap:wrap} .ai-selections label select{width:auto}
+
+/* Match results */
+#resultsDialog{width:min(820px,calc(100vw - 28px));max-width:820px;padding:24px;line-height:1.45}
+#resultsDialog h2{font-size:30px} #resultsDialog .close{position:sticky;top:0;z-index:1}
+.results-score{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
+.results-score-team{display:flex;align-items:center;justify-content:space-between;padding:10px 15px;border:1px solid #665477;border-radius:8px;background:#30243d}
+.results-score-team span{font-size:10px;letter-spacing:1.3px;font-weight:700}.results-score-team strong{font:32px 'Barlow Condensed',sans-serif}
+.results-score-team.blue{color:#9dc4ff}.results-score-team.red{color:#ffaaa0}
+#resultsContent .results-outcome{text-align:center;color:#e0d3e9;margin:9px 0 4px;font-size:11px}
+.results-section{margin-top:18px}.results-section h3{font-size:13px;margin:0 0 4px!important}.results-note{font-size:10px;color:#c4b5ce;line-height:1.45}
+.results-table-wrap{overflow-x:auto;border:1px solid #564465;border-radius:7px;margin-top:8px}
+.results-table{width:100%;border-collapse:collapse;white-space:nowrap;text-align:right;font-size:11px}
+.results-table th,.results-table td{padding:8px 10px;border-bottom:1px solid #4d3c5a}.results-table tr:last-child th,.results-table tr:last-child td{border-bottom:0}
+.results-table thead th{color:#c8b5d4;font-size:9px;letter-spacing:.3px;background:#2e223b}.results-table th:first-child{text-align:left}.results-table tbody th{font-weight:600}.results-table tbody tr:nth-child(even){background:#2b2036}
+@media(max-width:600px){#resultsDialog{padding:16px}.results-table th,.results-table td{padding:7px 9px}}

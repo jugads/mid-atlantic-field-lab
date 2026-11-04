@@ -1,6 +1,6 @@
-import {defenderInput,defenderTeam} from './defender.js?v=strategy17';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=strategy17';
-import {FieldView} from './view3d.js?v=strategy17';
+import {defenderInput,defenderTeam} from './defender.js?v=results19';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=results19';
+import {FieldView} from './view3d.js?v=results19';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
@@ -57,13 +57,23 @@ for(const button of document.querySelectorAll('[data-hold]')){
 new ResizeObserver(()=>view.resize()).observe(canvas);$('camera').onchange=()=>view.setCamera($('camera').value);
 const formatTime=seconds=>{const t=Math.max(0,Math.ceil(seconds-1e-7));return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;};
 function renderResults(){
- const box=$('resultsContent');box.replaceChildren();const title=document.createElement('p');title.textContent=`Final: Blue ${sim.scores.blue} – ${sim.scores.red} Red · AUTO ${sim.autoScores.blue} – ${sim.autoScores.red}`;box.append(title);
- const data=sim.matchStats;if(!data){const p=document.createElement('p');p.textContent='Detailed statistics are unavailable for this match.';box.append(p);return;}
- const h=document.createElement('h3');h.textContent='Fuel points by period';box.append(h);
- for(const [id,label] of [['auto','AUTO'],['transition','Transition'],['shift1','Shift 1'],['shift2','Shift 2'],['shift3','Shift 3'],['shift4','Shift 4'],['endgame','Endgame']]){const p=document.createElement('p'),v=data.periods[id]||{blue:0,red:0};p.textContent=`${label}: Blue ${v.blue} – ${v.red} Red`;box.append(p);}
- const f=document.createElement('p');f.textContent=`Fouls: Blue ${sim.fouls.blue.minor} minor / ${sim.fouls.blue.major} major; Red ${sim.fouls.red.minor} minor / ${sim.fouls.red.major} major. Foul points: Blue +${sim.foulPoints.blue}, Red +${sim.foulPoints.red}.`;box.append(f);
- const head=document.createElement('h3');head.textContent='Robot contributions';box.append(head);
- for(const r of data.robots){const p=document.createElement('p');const accuracy=r.resolved?Math.round(100*r.made/r.resolved)+'%':'—';p.textContent=`${r.alliance.toUpperCase()} ${r.team}: ${r.points} fuel points · ${r.made}/${r.resolved} shots in hub (${accuracy}) · ${r.passes} passes · ${r.collected} collected · ${r.cycles} collection-and-release cycles`;box.append(p);}
+ const box=$('resultsContent');box.replaceChildren();
+ const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!==undefined)node.textContent=String(text);return node;};
+ const score=el('div','results-score');
+ for(const [alliance,label] of [['blue','BLUE'],['red','RED']]){const item=el('div',`results-score-team ${alliance}`);item.append(el('span','',label),el('strong','',sim.scores[alliance]));score.append(item);}
+ box.append(score);const outcome=sim.scores.blue===sim.scores.red?'Tie match':`${sim.scores.blue>sim.scores.red?'Blue':'Red'} wins`;box.append(el('p','results-outcome',`${outcome} · AUTO ${sim.autoScores.blue} – ${sim.autoScores.red}`));
+ const data=sim.matchStats;if(!data){box.append(el('p','results-empty','Detailed statistics are unavailable for this match.'));return;}
+ const section=(title,subtitle)=>{const group=el('section','results-section');group.append(el('h3','',title));if(subtitle)group.append(el('p','results-note',subtitle));box.append(group);return group;};
+ const table=(parent,labels,rows)=>{const wrap=el('div','results-table-wrap'),table=el('table','results-table'),thead=el('thead'),header=el('tr'),body=el('tbody');
+  for(const label of labels)header.append(el('th','',label));thead.append(header);table.append(thead);
+  for(const row of rows){const tr=el('tr');for(let i=0;i<row.length;i++){const cell=el(i?'td':'th','',row[i]);if(!i)cell.scope='row';tr.append(cell);}body.append(tr);}table.append(body);wrap.append(table);parent.append(wrap);};
+ const periods=section('Fuel points by period','Points from fuel only; foul points are shown separately.');
+ table(periods,['Period','Blue','Red'],[['auto','AUTO'],['transition','Transition'],['shift1','Shift 1'],['shift2','Shift 2'],['shift3','Shift 3'],['shift4','Shift 4'],['endgame','Endgame']].map(([id,label])=>{const v=data.periods[id]||{blue:0,red:0};return [label,v.blue,v.red];}));
+ const robots=section('Robot contributions','Accuracy is fuel entering a hub ÷ resolved scoring shots.');
+ table(robots,['Robot','Points','In / shots','Accuracy','Passes','Collected','Cycles'],data.robots.map(r=>[`${r.alliance.toUpperCase()} ${r.team}`,r.points,`${r.made} / ${r.resolved}`,r.resolved?Math.round(100*r.made/r.resolved)+'%':'—',r.passes,r.collected,r.cycles]));
+ const fouls=section('Fouls','Foul points are awarded to the opposing alliance.');
+ table(fouls,['Alliance','Minor','Major','Points awarded'],['blue','red'].map(a=>[a.toUpperCase(),sim.fouls[a].minor,sim.fouls[a].major,sim.foulPoints[a]]));
+ box.append(el('p','results-note','A cycle is a collection period followed by a shot or pass. Scroll sideways to see all robot statistics on a small screen.'));
 }
 function updateMatch(){
  const p=sim.phase,preparing=online.active?online.room.status==='countdown':countdown.active,ready=online.active?online.room.status==='lobby':p.id==='ready'&&!preparing,finished=p.id==='finished',paused=online.active?online.room.status==='paused'||online.state==='reconnecting':preparing?!countdown.running:sim.started&&!sim.running&&!finished;
