@@ -50,7 +50,14 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
         const lanes = crossingLanes;
         const hubX = red ? 16.54 - 4.03 - 1.194 / 2 : 4.03 + 1.194 / 2;
         const lane = lanes.reduce((best, y) => {
-          const cost = v => Math.abs(r.y - v) + (Math.abs(player.x - hubX) < 2 && Math.abs(player.y - v) < 1.25 ? 5 : 0) + (state.avoidLane && sim.time < state.avoidLane.until && Math.abs(v - state.avoidLane.y) < .2 ? 8 : 0) + (v === .69 || v === 8.07 - .69 ? 0 : .35);
+          const cost = v => {
+            const traffic = sim.fleet.reduce((sum, entry, index) => {
+              if (index === botIndex || !entry.robot) return sum;
+              const other = entry.robot, dx = Math.abs(other.x - hubX), dy = Math.abs(other.y - v);
+              return sum + (dx < 2 && dy < 1.2 ? 4 * (1 - dy / 1.2) : 0);
+            }, 0);
+            return Math.abs(r.y - v) + traffic + (state.avoidLane && sim.time < state.avoidLane.until && Math.abs(v - state.avoidLane.y) < .2 ? 8 : 0) + (v === .69 || v === 8.07 - .69 ? 0 : .35);
+          };
           return cost(y) < cost(best) ? y : best;
         });
         const half = defender.config.length / 2 + .18;
