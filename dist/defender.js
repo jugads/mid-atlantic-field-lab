@@ -156,7 +156,10 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
       for (const b of available) {
         const x = Math.floor(b.x / cell), y = Math.floor(b.y / cell); let count = 0;
         for (let dx = -1; dx <= 1; dx++)for (let dy = -1; dy <= 1; dy++)count += buckets.get(key(x + dx, y + dy)) || 0;
-        const distance = Math.hypot(b.x - r.x, b.y - r.y), score = Math.min(defender.config.capacity - defender.inventory, count) / (1 + .6 * distance);
+        const distance = Math.hypot(b.x - r.x, b.y - r.y);
+        // Passing robots refill at the densest available cluster; distance
+        // breaks ties, while blocked targets remain temporarily excluded.
+        const score = passing ? count : Math.min(defender.config.capacity - defender.inventory, count) / (1 + .6 * distance);
         if (score > best || (score === best && distance < closest)) { best = score; closest = distance; state.target = b; }
       }
       state.targetSince = sim.time; state.targetDistance = closest;
@@ -218,7 +221,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     if (path.stage === 2) { if (Math.abs(r.x - path.exit) > .3) return driveTo(path.exit, path.lane, false, 1); ds.bypass = null; }
   }
   const bumpOnly = enemy && (enemy.height > .5652 || enemy.width > 1.30);
-  if (hard && bumpOnly && Math.abs(player.x - hubX) < 3 && Math.abs(r.x - hubX) < 2.7) r.defensePush = 1.14;
+  if (hard && bumpOnly && Math.abs(player.x - hubX) < 3 && Math.abs(r.x - hubX) < 2.7) r.defensePush = 1.20;
   // Defend the scoring zone when it has enough loose fuel for the opponent;
   // otherwise protect the bump to interrupt their next neutral-zone trip.
   if (bumpOnly && (!Number.isFinite(ds.zoneCheckedAt) || sim.time - ds.zoneCheckedAt > .5)) {
@@ -247,7 +250,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
       else return driveTo(path.x, lane, false, 1);
     }
   } else if (!bumpOnly) ds.laneShift = null;
-  if (bumpOnly && nearBump && distance < (hard ? 4.5 : 2.2) && Math.abs(dy) < 1.1 && (approaching || (hard && ds.bumpEngagedUntil > sim.time))) {
+  if (bumpOnly && nearBump && distance < (hard ? 4.5 : 2.2) && Math.abs(dy) < (hard ? 1.45 : 1.1) && (approaching || (hard && ds.bumpEngagedUntil > sim.time))) {
     if (hard && approaching) ds.bumpEngagedUntil = sim.time + 1.5;
     // Hard mode holds bumper pressure through contact instead of yielding as
     // soon as the opposing robot slows; use bounded displacement and the pin
@@ -387,7 +390,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   const waitingToScore = role === 'score' && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance) && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30));
   if (waitingToScore || (!active && home && ['collect','pass'].includes(role))) input.shoot = false;
   else if (role === 'pass' && !passClear && !sim.activeAt(c.alliance)) input.shoot = false;
-  else if (role === 'pass' && bot.inventory > 0 && passClear && sim.phase.id !== 'auto' && (!sim.activeAt(c.alliance) || sim.phase.id === 'endgame')) input.shoot = true;
-  else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
+  else if (role === 'pass' && bot.inventory > 0 && passClear && sim.phase.id === 'endgame') input.shoot = true;
+  else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active && role !== 'pass') || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
   return input;
 }
