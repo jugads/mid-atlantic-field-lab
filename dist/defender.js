@@ -19,6 +19,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     return { moveX: dx / distance * throttle, moveY: dy / distance * throttle, turnAxis: Math.max(-1, Math.min(1, error * 1.5)), intake };
   };
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
+  const passClear = red ? r.x < 16.54 - 4.03 - 1.194 - defender.config.length / 2 - .08 : r.x > 4.03 + 1.194 + defender.config.length / 2 + .08;
   const waitingToScore = role === 'score' && !canCrossTrench && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const passing = role === 'pass' && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
@@ -108,13 +109,13 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     }
     // Passing requires shooting from outside our alliance zone. Leave home
     // with any fuel instead of parking there with the trigger suppressed.
-    if (passing && home && defender.inventory > 0) {
+    if (passing && !passClear && defender.inventory > 0) {
       state.collecting = false;
-      return crossTrench(false) || driveTo(red ? 10.8 : 5.74, r.y < 4.035 ? 2.51 : 5.56, true, 1);
+      return crossTrench(false) || driveTo(red ? 10.34 : 6.2, r.y < 4.035 ? 2.51 : 5.56, true, 1);
     }
     if (state.route) { const crossing = crossTrench(state.route.towardHome); if (crossing) return crossing; }
     if (!state.collecting && defender.inventory > 0) {
-      if (passing && !home) return { shoot: true, intake: true };
+      if (passing && passClear) return { shoot: true, intake: true };
       if (!home) { const crossing = crossTrench(true); if (crossing) return crossing; }
       if (waitingToScore) return {};
       if (hard) {
@@ -366,6 +367,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   const bot = sim.fleet[botIndex], c = bot.config, r = bot.robot;
   const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
   const home = c.alliance === 'red' ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
+  const passClear = c.alliance === 'red' ? r.x < 16.54 - 4.03 - 1.194 - c.length / 2 - .08 : r.x > 4.03 + 1.194 + c.length / 2 + .08;
   const hubX = c.alliance === 'red' ? 16.54 - 4.627 : 4.627;
   // Defenders should not pursue contact into either tower's endgame area.
   // Keep a robot-width buffer around the structure and steer out if already inside.
@@ -384,7 +386,8 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   }
   const waitingToScore = role === 'score' && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance) && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30));
   if (waitingToScore || (!active && home && ['collect','pass'].includes(role))) input.shoot = false;
-  else if (role === 'pass' && bot.inventory > 0 && !home && sim.phase.id !== 'auto' && (!sim.activeAt(c.alliance) || sim.phase.id === 'endgame')) input.shoot = true;
+  else if (role === 'pass' && !passClear && !sim.activeAt(c.alliance)) input.shoot = false;
+  else if (role === 'pass' && bot.inventory > 0 && passClear && sim.phase.id !== 'auto' && (!sim.activeAt(c.alliance) || sim.phase.id === 'endgame')) input.shoot = true;
   else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
   return input;
 }
