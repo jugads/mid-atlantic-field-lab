@@ -43,6 +43,8 @@ host2.guestInput={};host2.guestInputAt=1100;host2.advanceHost(1200,{});
 assert(four.fleet[2].robot.x<7,'blue bot chases red human instead of red bot');
 console.log('PASS 2v2 bots defend the opposing humans');
 const solo3=createHostSimulation({mode:'3v3solo',players:[{id:'a',team:'341',alliance:'blue'}]});
+const practice=createHostSimulation({mode:'3v0',players:[{id:'a',team:'341',alliance:'blue'}],aiTeams:{blue:['316','708']}});
+assert.deepEqual(practice.fleet.map(e=>e.config.alliance),['blue','blue','blue']);
 const room3=createHostSimulation({mode:'3v3',players:[{id:'a',team:'341',alliance:'blue'},{id:'b',team:'708',alliance:'red'}]});
 for(const s of [solo3,room3]){assert.equal(s.fleet.length,6);assert.equal(s.fleet.filter(e=>e.config.alliance==='blue').length,3);assert.equal(s.fleet.filter(e=>e.config.alliance==='red').length,3);assert.equal(s.initialCenterCount,360);}
 const {matchInputs}=await import('../dist/multiplayer.js');solo3.start();const ci=matchInputs(solo3,[{}]);assert.equal(ci.length,6);assert(ci.slice(1).every(c=>typeof c==='object'));
