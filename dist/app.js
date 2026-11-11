@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=tandem35';
-import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem35';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem36';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem36';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -220,9 +220,9 @@ function renderStartLayout(){
   const bounds=a=>{const e=startPlacement(c,a,blue);return {e,lo:blue?e.ex:W-SL+e.ex,hi:blue?SL-e.ex:W-e.ex};};
   const touchesLine=(x,a)=>{const {lo,hi}=bounds(a);return Math.abs(x-(blue?hi:lo))<E;};
   const touchesPeer=(x,y,a)=>{const {e}=bounds(a);return peers.some(o=>{const q=peerBox(o),dx=Math.abs(x-q.x)-(e.ex+q.ex),dy=Math.abs(y-q.y)-(e.ey+q.ey);return (Math.abs(dx)<E&&dy<-E)||(Math.abs(dy)<E&&dx<-E);});};
-  // Legal: inside the zone, no overlap, and touching the start line or flush against a teammate.
+  // Legal: inside the zone, no overlap, and touching the start line.
   const legal=(x,y,a)=>{const {e,lo,hi}=bounds(a);if(x<lo-E||x>hi+E||y<e.ey-E||y>H-e.ey+E)return false;
-   const p={x,y,a,length:c.length,width:c.width};if(peers.some(o=>obbOverlap(p,peerBox(o))))return false;return touchesLine(x,a)||touchesPeer(x,y,a);};
+   const p={x,y,a,length:c.length,width:c.width};if(peers.some(o=>obbOverlap(p,peerBox(o))))return false;return touchesLine(x,a);};
   // Snap to the line, teammates' bumpers, walls and teammates' centerlines, then take the nearest legal pose.
   const settle=(wantX,wantY,a,snap=true)=>{const {e,lo,hi}=bounds(a),ylo=e.ey,yhi=H-e.ey,line=blue?hi:lo;
    const xs=[line],ys=[ylo,yhi];for(const o of peers){const q=peerBox(o);xs.push(q.x-q.ex-e.ex,q.x+q.ex+e.ex);ys.push(q.y-q.ey-e.ey,q.y+q.ey+e.ey);}
@@ -233,15 +233,24 @@ function renderStartLayout(){
    let best=null,bd=Infinity;for(const cx of xc)for(const cy of yc){if(!legal(cx,cy,a))continue;const d=Math.hypot(cx-x,cy-y);if(d<bd){bd=d;best={x:cx,y:cy};}}
    return best;};
   const apply=(x,y,a)=>{r.x=x;r.y=y;r.a=a;r.startX=x;r.startY=y;r.startA=a;paint();};
-  const where=()=>touchesLine(r.x,r.a)?'touching the start line':'bumper to bumper with a teammate';
+  const where=()=>'touching the start line';
   const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts ${headingName(c,r.a)}, ${where()}. The driver station view lines up with it.${tandemNote()}`;
    if(room)online.send({type:'start_position',team:c.team,x:r.x,y:r.y,a:r.a});else{soloStartPositions[c.team]={x:r.x,y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
-  paint();entries.push({g,entry});
+  const api={cfg:c,r,apply,commit};entries.push({g,entry,api,canEdit});
   if(!canEdit)continue;
   const norm=a=>Math.atan2(Math.sin(a),Math.cos(a));
   const select=()=>{startSelected=c.team;for(const o of entries)o.g.classList.toggle('selected',o.entry===entry);$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;
    const turn=a=>{const next=settle(r.x,r.y,a,false);if(!next){$('startLayoutMessage').textContent='No room to rotate there. Move a teammate first.';return;}apply(next.x,next.y,a);commit();};
-   startActions={rotate:dir=>turn(norm(r.a+dir*Math.PI/2)),flip:()=>turn(norm(r.a+Math.PI))};};
+   startActions={rotate:dir=>turn(norm(r.a+dir*Math.PI/2)),flip:()=>turn(norm(r.a+Math.PI)),
+    // Turn this robot and its nearest teammate to face along the line and park them end to end, bumper to bumper.
+    stack:()=>{const mates=entries.filter(o=>o.entry!==entry&&o.canEdit).sort((p,q)=>Math.abs(p.api.r.y-r.y)-Math.abs(q.api.r.y-r.y));
+     if(!mates.length){$('startLayoutMessage').textContent='Stacking needs a second robot you control.';return;}
+     const o=mates[0].api,a=Math.PI/2,eS=startPlacement(c,a,blue),eO=startPlacement(o.cfg,a,blue),upper=r.y<=o.r.y?[eS,eO]:[eO,eS],span=2*eS.ey+2*eO.ey;
+     const top=Math.max(0,Math.min(H-span,(r.y+o.r.y)/2-span/2)),yUpper=top+upper[0].ey,yLower=top+span-upper[1].ey,mine=r.y<=o.r.y?[yUpper,yLower]:[yLower,yUpper];
+     const others=peers.filter(p=>p!==mates[0].entry);
+     const fits=others.every(p=>!obbOverlap({x:eS.x,y:mine[0],a,length:c.length,width:c.width},peerBox(p))&&!obbOverlap({x:eO.x,y:mine[1],a,length:o.cfg.length,width:o.cfg.width},peerBox(p)));
+     if(!fits){$('startLayoutMessage').textContent='No room to stack there. Move a teammate first.';return;}
+     o.apply(eO.x,mine[1],a);apply(eS.x,mine[0],a);o.commit();commit();}};};
   if(startSelected===c.team)select();
   let dragging=false;const pointer=e=>{const rect=svg.getBoundingClientRect();return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.height*H];};
   const move=(x,y,snap=true)=>{const next=settle(x,y,r.a,snap);if(!next){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}apply(next.x,next.y,r.a);return true;};
@@ -249,7 +258,7 @@ function renderStartLayout(){
   g.addEventListener('pointermove',e=>{if(dragging)move(...pointer(e));});
   const finish=e=>{if(!dragging)return;dragging=false;g.classList.remove('dragging');if(e.type==='pointerup')move(...pointer(e));commit();};
   g.addEventListener('pointerup',finish);g.addEventListener('pointercancel',finish);
-  g.addEventListener('focus',select);
+  g.addEventListener('focus',select);g.addEventListener('dblclick',()=>startActions?.rotate(1));
   g.addEventListener('keydown',e=>{
    const step=e.shiftKey?.02:.1,d={ArrowUp:[0,-step],ArrowDown:[0,step],ArrowLeft:[-step,0],ArrowRight:[step,0]}[e.key];
    if(d){e.preventDefault();e.stopPropagation();if(move(r.x+d[0],r.y+d[1],false))commit();}
@@ -258,7 +267,7 @@ function renderStartLayout(){
  }
  if(!entries.some(o=>o.entry.config.team===startSelected&&editable.has(o.entry.config.team))){startSelected=null;startActions=null;$('startSelected').textContent='Select a robot';}
 }
-$('startRotL').onclick=()=>startActions?.rotate(-1);$('startRotR').onclick=()=>startActions?.rotate(1);$('startFlip').onclick=()=>startActions?.flip();
+$('startRotL').onclick=()=>startActions?.rotate(-1);$('startRotR').onclick=()=>startActions?.rotate(1);$('startFlip').onclick=()=>startActions?.flip();$('startStack').onclick=()=>startActions?.stack();
 function renderAiSelections(){
  const box=$('aiSelections'),inRoom=onlineMode&&['3v3','3v3coop'].includes(online.room?.mode)&&online.room.status==='lobby',solo=!onlineMode&&['3v3solo','3v0'].includes($('soloMatch').value);
  box.hidden=!(inRoom||solo);if(box.hidden){box.replaceChildren();for(const button of $('robotChoices').children)button.disabled=false;renderStartLayout();return;}
