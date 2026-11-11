@@ -403,3 +403,10 @@ test('scored shots and passes are attributed to the firing robot and period',()=
  const {resolve}=require('../dist/team-presets.js'),s=new Simulation();s.enableMultiplayer([resolve('316','blue'),resolve('9094','red')]);s.start();s.time=40;s.autoWinner='blue';s.loadDriver(1);s.robot.x=14;s.turretAngle=s.aimAngle;
  assert.equal(s.fire(1),1);const shot=s.balls.at(-1);assert.equal(shot.shooterIndex,1);s.processHub(shot,hubs[1]);assert.equal(s.matchStats.robots[1].shots,1);assert.equal(s.matchStats.robots[1].points,1);assert.equal(s.matchStats.periods.shift1.red,1);
 });
+
+test('passing range is capped at three quarters of the field except 341 and 9094',()=>{
+ for(const team of Object.keys(profiles))for(const alliance of ['blue','red']){
+  const s=empty(resolvePreset(team,alliance));s.robot.x=alliance==='blue'?W-.5:.5;s.robot.y=H/2;const sol=s.shotSolution;
+  assert(sol.passing);if(['341','9094'].includes(team)){assert(!sol.passLimited);assert(Math.abs(sol.reach-sol.distance)<1e-8);}else{assert(sol.passLimited,team+' should be range-limited');assert(Math.abs(sol.reach-W*.75)<1e-8);assert(Math.hypot(sol.target.x-s.robot.x,sol.target.y-s.robot.y)<=W*.75+1e-8);}
+ }
+});

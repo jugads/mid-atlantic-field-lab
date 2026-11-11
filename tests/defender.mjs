@@ -13,6 +13,22 @@ bot.inventory=8;robot.x=10;assert(!defenderInput(sim,'medium').shoot&&Math.hypot
 sim.activeAt=()=>false;const easy=defenderInput(sim,'easy'),medium=defenderInput(sim,'medium'),hard=defenderInput(sim,'hard');
 assert.equal(Math.hypot(easy.moveX,easy.moveY),Math.hypot(medium.moveX,medium.moveY),'easier defenses use the same drive speed');assert.equal(hard.intake,true);
 console.log('Defender phase and difficulty checks passed');
+// A bump-only scoring bot fills during the other alliance's shift, returns
+// home, and holds its fuel until its own hub becomes active.
+for (const team of ['708', '8513']) {
+  const {createRequire}=await import('node:module'); const req=createRequire(import.meta.url);
+  const cfg={...req('../dist/team-presets.js').resolve(team,'red'),aiRole:'score'};
+  const b={config:cfg,robot:{x:13.5,y:3,a:Math.PI},inventory:0};
+  const s={fleet:[{robot:{x:14,y:3,vx:0,vy:0}},b],phase:{id:'shift1',shift:true},phaseRemaining:2,activeAt:()=>false,time:30,balls:[{x:14.5,y:3,z:.075}]};
+  assert(defenderInput(s,'hard').intake,`${team} collects instead of defending`);
+  b.inventory=cfg.capacity-1; s.time+=.1;
+  assert(defenderInput(s,'hard').intake,`${team} fills to capacity even near the shift change`);
+  b.inventory=cfg.capacity; s.time+=.1;
+  assert(!defenderInput(s,'hard').shoot && !defenderInput(s,'hard').moveX,`${team} holds a full load at home`);
+  b.robot.x=9; s.time+=.1;
+  const returning=defenderInput(s,'hard'); assert(!returning.shoot && returning.moveX>0,`${team} returns home without passing`);
+}
+console.log('Bump-only scorers collect and wait through inactive shifts');
 // Exercise a full scoring cycle and a return from the far side using real physics.
 const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
 const {Simulation}=require('../dist/physics.js');const {resolve}=require('../dist/team-presets.js');
@@ -239,4 +255,13 @@ for(const alliance of ['blue','red'])for(const towerSide of ['blue','red']){
  const cmd=defenderInput(s,'hard',1,0);assert((cmd.moveX||0)*edge>=0,`${alliance} must not drive toward ${towerSide} tower`);
  for(let i=0;i<2*120;i++)s.step(1/120,[{},defenderInput(s,'hard',1,0)]);
  assert((s.fleet[1].robot.x-towerX)*edge>1.7,`${alliance} must leave space near ${towerSide} tower`);
+}
+
+// Bump-only AI must select a bump even when the trench is the nearest crossing.
+for(const team of ['708','8513'])for(const alliance of ['blue','red'])for(const mode of ['auto','defend']){
+ const enemy=alliance==='blue'?'red':'blue',s=new Simulation();s.enableMultiplayer([resolve('341',enemy),{...resolve(team,alliance),aiRole:mode}]);s.start();s.time=40;s.autoWinner=mode==='defend'?alliance:enemy;s.balls=[];
+ const bot=s.fleet[1],hub=alliance==='blue'?4.627:11.913;Object.assign(bot.robot,{x:alliance==='blue'?hub-1.5:hub+1.5,y:.7,a:0,vx:0,vy:0});
+ Object.assign(s.fleet[0].robot,{x:alliance==='blue'?hub+2:hub-2,y:.7,a:0,vx:0,vy:0});
+ if(mode==='auto'){bot.inventory=0;bot.state.inventory=0;s.balls=[{x:alliance==='blue'?hub+2:hub-2,y:1,z:.075,vx:0,vy:0,vz:0}];}
+ const control=defenderInput(s,'hard',1,0);assert((control.moveY||0)>.1,`${team} ${alliance} ${mode} should move toward a bump`);
 }
