@@ -385,7 +385,8 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
 // Swiveling shooters can score while following their normal collection or
 // evasion route. Only fire inside their scoring zone and effective range.
 export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0) {
-  const role = sim.fleet[botIndex].config.aiRole || 'auto';
+  // With no opponent (3v0 practice) the default AI passes fuel home whenever its hub is inactive.
+  const role = (sim.fleet[botIndex].config.aiRole || 'auto') === 'auto' && opponentIndex < 0 ? 'pass' : (sim.fleet[botIndex].config.aiRole || 'auto');
   const input = planDefenderInput(sim, difficulty, botIndex, opponentIndex, role);
   const bot = sim.fleet[botIndex], c = bot.config, r = bot.robot;
   const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
