@@ -5,6 +5,9 @@ const defenseState = new WeakMap();
 function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0, role = 'auto') {
   const defender = sim.fleet[botIndex], player = sim.fleet[opponentIndex].robot, r = defender.robot;
   const hard = difficulty === 'hard', easy = difficulty === 'easy';
+  // Route according to this robot's clearance, not the robot it is defending.
+  const canCrossTrench = globalThis.FieldPhysics?.canUseTrench?.(defender.config) ?? ((defender.config.height ?? 0) <= .5652 && (defender.config.width ?? 0) <= 1.30);
+  const crossingLanes = canCrossTrench ? [.69, 2.51, 8.07 - 2.51, 8.07 - .69] : [2.51, 8.07 - 2.51];
   const defenseSpeed = 1;
   const driveTo = (x, y, intake = hard, speed = defenseSpeed, alignIntake = false) => {
     const dx = x - r.x, dy = y - r.y, distance = Math.hypot(dx, dy);
@@ -16,8 +19,9 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     return { moveX: dx / distance * throttle, moveY: dy / distance * throttle, turnAxis: Math.max(-1, Math.min(1, error * 1.5)), intake };
   };
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
+  const waitingToScore = role === 'score' && !canCrossTrench && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
-  const scoring = sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
+  const scoring = waitingToScore || sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
   // A small defensive traction advantage affects contact, not top speed.
   r.defensePush = !scoring && hard ? 1.06 : 1;
   if (scoring) {
@@ -29,19 +33,19 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     state.lastTime = sim.time;
     if (state.phase !== sim.phase.id) {
       state.phase = sim.phase.id;
-      state.collecting = defender.inventory < defender.config.capacity && (!Number.isFinite(sim.phaseRemaining) || sim.phaseRemaining > 4);
+      state.collecting = defender.inventory < defender.config.capacity && (waitingToScore || !Number.isFinite(sim.phaseRemaining) || sim.phaseRemaining > 4);
       state.since = sim.time; state.target = null; state.route = null; state.lane = null;
     }
     if (defender.inventory === 0 && !state.collecting) { state.collecting = true; state.since = sim.time; state.target = null; }
     // Batch sizable loads and leave time to return before switching to defense.
-    if (state.collecting && (defender.inventory >= (hard ? (role === 'collect' ? defender.config.capacity : Math.min(defender.config.capacity, 30)) : defender.config.capacity) || (defender.inventory > 0 && Number.isFinite(sim.phaseRemaining) && sim.phaseRemaining <= (hard && sim.phase.shift ? 9 : 4)))) { state.collecting = false; state.target = null; state.lane = null; }
+    if (state.collecting && (defender.inventory >= (waitingToScore || role === 'collect' ? defender.config.capacity : Math.min(defender.config.capacity, 30)) || (!waitingToScore && defender.inventory > 0 && Number.isFinite(sim.phaseRemaining) && sim.phaseRemaining <= (hard && sim.phase.shift ? 9 : 4)))) { state.collecting = false; state.target = null; state.lane = null; }
     // Cross the entire structure before re-planning. Crossing the alliance-line
     // alone does not mean the back of the chassis has cleared the divider.
     const crossTrench = (towardHome) => {
       if (!state.route || state.route.towardHome !== towardHome) {
         // Select an open crossing. A defending robot in the trench should
         // send us over the adjacent bump rather than into an endless push.
-        const lanes = [.69, 2.51, 8.07 - 2.51, 8.07 - .69];
+        const lanes = crossingLanes;
         const hubX = red ? 16.54 - 4.03 - 1.194 / 2 : 4.03 + 1.194 / 2;
         const lane = lanes.reduce((best, y) => {
           const cost = v => Math.abs(r.y - v) + (Math.abs(player.x - hubX) < 2 && Math.abs(player.y - v) < 1.25 ? 5 : 0) + (state.avoidLane && sim.time < state.avoidLane.until && Math.abs(v - state.avoidLane.y) < .2 ? 8 : 0) + (v === .69 || v === 8.07 - .69 ? 0 : .35);
@@ -104,6 +108,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     if (state.route) { const crossing = crossTrench(state.route.towardHome); if (crossing) return crossing; }
     if (!state.collecting && defender.inventory > 0) {
       if (!home) { const crossing = crossTrench(true); if (crossing) return crossing; }
+      if (waitingToScore) return {};
       if (hard) {
         // If the defender is about to make contact, reposition inside the
         // alliance zone before shooting instead of sitting and being pinned.
@@ -122,7 +127,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     const centerSafe = defender.config.length / 2 + .1;
     const eligible = b => !b.shot && !b.hubInside && b.z < .3 &&
       (red ? b.x >= 4.03 : b.x <= 16.54 - 4.03) &&
-      (!Number.isFinite(sim.phaseRemaining) || sim.phaseRemaining > 4 || (red ? b.x >= 16.54 - 4.03 : b.x <= 4.03)) &&
+      (waitingToScore || !Number.isFinite(sim.phaseRemaining) || sim.phaseRemaining > 4 || (red ? b.x >= 16.54 - 4.03 : b.x <= 4.03)) &&
       (sim.phase.id !== 'auto' || (red ? b.x >= 16.54 / 2 + centerSafe : b.x <= 16.54 / 2 - centerSafe));
     // Keep pursuing a chosen ball instead of oscillating between nearby targets.
     if (state.target && (!sim.balls.includes(state.target) || !eligible(state.target))) state.target = null;
@@ -170,6 +175,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
       }
       return driveTo(ball.x, ball.y, true, 1, true);
     }
+    if (waitingToScore) { state.collecting = false; return home ? {} : (crossTrench(true) || {}); }
     if (defender.inventory) { state.collecting = false; return home ? { shoot: true } : (crossTrench(true) || { shoot: true }); }
     return {};
   }
@@ -287,7 +293,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     const separated = (r.x - obstacleX) * (player.x - obstacleX) < 0 && Math.abs(r.x - obstacleX) > .65 && Math.abs(player.x - obstacleX) > .65;
     if (separated || ds.cross) {
       if (!ds.cross) {
-        const lanes = [.69, 2.51, 5.56, 7.38], dir = Math.sign(player.x - r.x);
+        const lanes = crossingLanes, dir = Math.sign(player.x - r.x);
         const lane = lanes.reduce((best, y) => Math.abs(r.y - y) + Math.abs(player.y - y) < Math.abs(r.y - best) + Math.abs(player.y - best) ? y : best);
         ds.cross = { lane, dir, entry: obstacleX - dir * 1.35, exit: obstacleX + dir * 1.35 };
       }
@@ -358,7 +364,8 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
       input.moveX=0;
     }
   }
-  if (!active && home && ['collect','pass'].includes(role)) input.shoot = false;
+  const waitingToScore = role === 'score' && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance) && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30));
+  if (waitingToScore || (!active && home && ['collect','pass'].includes(role))) input.shoot = false;
   else if (role === 'pass' && bot.inventory > 0 && !home) input.shoot = true;
   else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
   return input;

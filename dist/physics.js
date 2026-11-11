@@ -210,11 +210,11 @@
     }
     get shotSolution(){
       const h=this.shotTarget,r=this.robot,passing=!this.inAllianceZone;
-      const dx=h.x-r.x,dy=h.y-r.y,d=Math.hypot(dx,dy),reach=passing?d:Math.min(d,this.config.maxRange);
+      const dx=h.x-r.x,dy=h.y-r.y,d=Math.hypot(dx,dy),passRange=this.config.maxPassRange??(['341','9094'].includes(this.config.team)?Infinity:W*.75),reach=passing?Math.min(d,passRange):Math.min(d,this.config.maxRange);
       const factor=d>1e-8?reach/d:0,target={x:r.x+dx*factor,y:r.y+dy*factor,z:h.z};
       // Longer scoring shots stay aloft longer and therefore follow a higher arc.
       const flight=passing?clamp(d/5.2,1.05,2.25):clamp(.75+reach*.15,.9,2.25);
-      return {target,actualTarget:h,distance:d,reach,flight,passing,outOfRange:!passing&&d>this.config.maxRange+.001};
+      return {target,actualTarget:h,distance:d,reach,flight,passing,passLimited:passing&&d>passRange+.001,outOfRange:!passing&&d>this.config.maxRange+.001};
     }
     aimPID(state,error,dt){
       const c=this.config,kp=c.aimKp??16,ki=c.aimKi??.4,kd=c.aimKd??.12,limit=c.aimMaxRate??12;

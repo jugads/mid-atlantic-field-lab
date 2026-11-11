@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {driverStationPose} from './driver-camera.js';
 const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset,intakeSign}=globalThis.FieldPhysics;
 export class FieldView {
   constructor(canvas){
@@ -169,7 +170,7 @@ export class FieldView {
     this.disposeGroup(this.chassis);this.activeVisual=this.genericRobot(this.chassis,c);this.intakeBar=this.activeVisual.intakeBar;
     this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
   }
-  setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;}
+  setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;this.driverHead=null;}
   resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
   movement(x,y){
     const forward=new T.Vector3();this.camera.getWorldDirection(forward);forward.y=0;forward.normalize();
@@ -178,6 +179,7 @@ export class FieldView {
     return {moveX:right.x*x-forward.x*y,moveY:right.z*x-forward.z*y};
   }
   draw(sim,grid){
+    const now=performance.now(),cameraDt=this.cameraFrameTime===undefined?0:(now-this.cameraFrameTime)/1000;this.cameraFrameTime=now;
     const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
@@ -216,7 +218,13 @@ export class FieldView {
     this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#c8a5ff');
     this.passMarker.visible=passing;this.passMarker.position.set(target.x-W/2,.025,target.y-H/2);
     const side=c.alliance==='blue'?-1:1,fit=this.camera.aspect<1.25?1.2:1;
-    if(this.mode==='driver'){
+    const fov=this.mode==='station'?Math.max(40,Math.min(90,68*this.zoom)):46;
+    if(this.camera.fov!==fov){this.camera.fov=fov;this.camera.updateProjectionMatrix();}
+    if(this.mode==='station'){
+      this.driverHead=driverStationPose(this.driverHead,{x,y:r.z+c.height*.65,z},c,W,cameraDt);
+      const {eye,target}=this.driverHead;
+      this.camera.position.set(eye.x,eye.y,eye.z);this.cameraTarget.set(target.x,target.y,target.z);
+    }else if(this.mode==='driver'){
       this.camera.position.set(side*14*this.zoom*fit,14*this.zoom*fit,-side*5.5*this.zoom*fit);this.cameraTarget.set(side*1.2,.1,0);
     }else if(this.mode==='follow'){
       this.camera.position.lerp(new T.Vector3(x+side*6*this.zoom,7.5*this.zoom,z-side*2.3*this.zoom),.1);this.cameraTarget.set(x-side*1.3,.2,z);

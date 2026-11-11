@@ -1,6 +1,6 @@
-import {defenderInput,defenderTeam} from './defender.js?v=auto20';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=auto20';
-import {FieldView} from './view3d.js?v=auto20';
+import {defenderInput,defenderTeam} from './defender.js?v=camera25';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=camera25';
+import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
 const $=id=>document.getElementById(id),teams=Object.keys(profiles),sim=new Simulation(resolvePreset('341')),
@@ -78,6 +78,9 @@ function renderResults(){
 function updateMatch(){
  const p=sim.phase,preparing=online.active?online.room.status==='countdown':countdown.active,ready=online.active?online.room.status==='lobby':p.id==='ready'&&!preparing,finished=p.id==='finished',paused=online.active?online.room.status==='paused'||online.state==='reconnecting':preparing?!countdown.running:sim.started&&!sim.running&&!finished;
  $('picker').hidden=!ready;
+ const cameraParent=ready?$('startControls'):$('matchCamera');
+ if($('cameraControl').parentElement!==cameraParent)cameraParent.prepend($('cameraControl'));
+ $('matchCamera').hidden=ready;
  $('start').disabled=onlineMode&&!online.active; $('resultsButton').hidden=!finished;
  $('start').textContent=onlineMode?(online.self?.ready?'Cancel ready':'Ready up'):'Start match ↗';$('reset').hidden=ready;$('pause').hidden=ready||finished||(online.active&&preparing);if(online.active)$('reset').hidden=!finished;
  $('pause').textContent=paused?'▶ Resume':'Ⅱ Pause';$('reset').textContent=finished?'↺ Choose robot':'↺ Reset match';
@@ -107,7 +110,7 @@ function updateMatch(){
  if(overlay.innerHTML!==overlayContent)overlay.innerHTML=overlayContent;
  $('hint').textContent=ready?'Select a team to begin':paused?'Clock and physics paused':preparing?'GET READY · Controls start with AUTO':p.id==='auto'?'AUTO · Driver-controlled · Both hubs active':p.id==='auto-settle'||p.id==='final-settle'?'Driver input disabled · Waiting for airborne fuel to settle':finished?'Choose a robot to play again':
    (!sim.inAllianceZone?'PASS MODE · Hold Space to ferry fuel into your alliance zone':sim.shotSolution.outOfRange?'OUT OF RANGE · Shots will fall short':sim.config.archetype==='dumper'?'BIG DUMPER · Hold Space to aim and shoot':sim.activeAt(sim.config.alliance)?'YOUR HUB IS ACTIVE · Turret can shoot while moving':'YOUR HUB IS INACTIVE · Collect fuel for your next shift');
- $('shotMode').textContent=(sim.shotMode==='pass'?'↶ PASS TO HOME':'◎ SHOOT HUB')+' · '+(sim.shotSolution.outOfRange?'OUT OF RANGE':sim.fireStatus.startsWith('ALIGNING')?sim.fireStatus:sim.config.archetype==='dumper'?sim.fireStatus:'SWIVEL TURRET')+(sim.robot.shootingSpeedLimited?' · 30% DRIVE':'');
+ $('shotMode').textContent=(sim.shotMode==='pass'?'↶ PASS TO HOME':'◎ SHOOT HUB')+' · '+(sim.shotSolution.outOfRange?'OUT OF RANGE':sim.shotSolution.passLimited?'MAX PASS RANGE':sim.fireStatus.startsWith('ALIGNING')?sim.fireStatus:sim.config.archetype==='dumper'?sim.fireStatus:'SWIVEL TURRET')+(sim.robot.shootingSpeedLimited?' · 30% DRIVE':'');
  $('shotMode').classList.toggle('passing',sim.shotMode==='pass'||sim.shotSolution.outOfRange);
 }
 function draw(){
