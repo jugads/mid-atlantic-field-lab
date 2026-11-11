@@ -221,7 +221,7 @@ export class FieldView {
     const fov=this.mode==='station'?Math.max(40,Math.min(90,68*this.zoom)):46;
     if(this.camera.fov!==fov){this.camera.fov=fov;this.camera.updateProjectionMatrix();}
     if(this.mode==='station'){
-      this.driverHead=driverStationPose(this.driverHead,{x,y:r.z+c.height*.65,z},c,W,cameraDt);
+      this.driverHead=driverStationPose(this.driverHead,{x,y:r.z+c.height*.65,z},{...c,stationY:Number.isFinite(r.startY)?r.startY-H/2:undefined},W,cameraDt);
       const {eye,target}=this.driverHead;
       this.camera.position.set(eye.x,eye.y,eye.z);this.cameraTarget.set(target.x,target.y,target.z);
     }else if(this.mode==='driver'){

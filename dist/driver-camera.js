@@ -1,7 +1,7 @@
 // Eye position stays at the driver station; only the neck's yaw/pitch follow.
 export function driverStationPose(previous, robot, config, width, dt) {
   const side = config.alliance === 'red' ? 1 : -1;
-  const eye = {x: side * (width / 2 + .85), y: 1.75, z: -side * 2.2};
+  const eye = {x: side * (width / 2 + .85), y: 1.75, z: Number.isFinite(config.stationY) ? config.stationY : -side * 2.2};
   const dx = robot.x - eye.x, dz = robot.z - eye.z;
   const yaw = Math.atan2(dz, dx);
   const pitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 6,

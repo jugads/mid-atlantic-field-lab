@@ -88,10 +88,12 @@
       const occupied={blue:[],red:[]};this.fleet=this.roster.map(config=>{
         const c={...config},blue=c.alliance==='blue',candidates=startingLocations(c),used=occupied[c.alliance];
         // Reserve separate lanes for each parked robot in a multi-robot simulation.
-        const position=candidates.find(p=>used.every(o=>Math.abs(p.y-o.y)>=(c.width+o.width)/2+.05))||candidates[0];
+        const requested=Number.isFinite(c.startY)?Math.max(c.width/2,Math.min(H-c.width/2,c.startY)):null;
+        const valid=y=>used.every(o=>Math.abs(y-o.y)>=(c.width+o.width)/2+.05);
+        const position=requested!==null&&valid(requested)?{y:requested,area:'custom'}:candidates.find(p=>valid(p.y))||candidates[0];
         used.push({y:position.y,width:c.width});
         const robot={x:blue?FIELD.startLine-c.length/2:W-FIELD.startLine+c.length/2,
-          y:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
+          y:position.y,startY:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
         return {config:c,robot,inventory:Math.min(8,c.capacity)};
       });
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;

@@ -14,7 +14,7 @@ class Rooms{
   send(socket,data){if(socket?.readyState===1&&socket.bufferedAmount<512000)socket.send(JSON.stringify(data));}
   fail(socket,message){this.send(socket,{type:'error',message});}
   lobby(room){return {type:'room',protocol:2,code:room.code,mode:room.mode,status:room.status,countdown:room.countdown||0,hostId:room.hostId,stalled:!!room.stalled,
-    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,aiTeams:p.aiTeams,aiRoles:p.aiRoles,ready:p.ready,connected:!!p.socket,alliance:['coop','3v3coop'].includes(room.mode)||index===0?'blue':'red'}))};}
+    players:room.players.map((p,index)=>({index,id:p.id,team:p.team,aiTeams:p.aiTeams,aiRoles:p.aiRoles,startPositions:p.startPositions||{},ready:p.ready,connected:!!p.socket,alliance:['coop','3v3coop'].includes(room.mode)||index===0?'blue':'red'}))};}
   broadcast(room,message=this.lobby(room)){for(const p of room.players)this.send(p.socket,message);}
   welcome(room,p){this.send(p.socket,{type:'welcome',protocol:2,id:p.id,token:p.token,code:room.code});this.broadcast(room);if(room.snapshot&&p.id!==room.hostId)this.send(p.socket,room.snapshot);}
   handle(socket,msg){
@@ -79,6 +79,10 @@ class Rooms{
     if(msg.type==='select_ai_role'){
       if(room.status!=='lobby'||!isFullMatch(room.mode)||!Number.isInteger(msg.slot)||msg.slot<0||msg.slot>=aiSlots(room.mode,room.players.indexOf(p))||!['auto','score','defend','collect','pass'].includes(msg.role))return this.fail(socket,'Invalid AI role.');
       p.aiRoles[msg.slot]=msg.role;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
+    }
+    if(msg.type==='start_position'){
+      if(room.status!=='lobby'||typeof msg.team!=='string'||![p.team,...p.aiTeams.slice(0,aiSlots(room.mode,room.players.indexOf(p)))].includes(msg.team)||!Number.isFinite(msg.y)||msg.y<.5||msg.y>7.57)return this.fail(socket,'Invalid starting position.');
+      p.startPositions=p.startPositions||{};p.startPositions[msg.team]=msg.y;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='ready'){
       if(room.status!=='lobby')return;
