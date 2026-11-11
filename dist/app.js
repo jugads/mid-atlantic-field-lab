@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=traffic31';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=traffic31';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem34';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem34';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -36,7 +36,7 @@ function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.tea
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
-$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if(['3v3solo','3v0'].includes($('soloMatch').value)){const match=createHostSimulation({mode:$('soloMatch').value,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster.map(c=>({...c,startY:soloStartPositions[c.team]})));}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);if(!sim.multiplayer){sim.roster[0].startY=soloStartPositions[selectedTeam];sim.reset();}else if($('soloMatch').value==='1v1'&&sim.fleet.length===2){sim.roster[0].startY=soloStartPositions[selectedTeam];sim.enableMultiplayer(sim.roster);}countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
+$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if(['3v3solo','3v0'].includes($('soloMatch').value)){const match=createHostSimulation({mode:$('soloMatch').value,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster.map(c=>({...c,...startFields(soloStartPositions[c.team])})));}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);if(!sim.multiplayer){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.reset();}else if($('soloMatch').value==='1v1'&&sim.fleet.length===2){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.enableMultiplayer(sim.roster);}countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
 $('pause').onclick=togglePause;$('reset').onclick=reset;
 $('resultsButton').onclick=()=>{renderResults();$('resultsDialog').showModal();};$('closeResults').onclick=()=>$('resultsDialog').close();
 $('help').onclick=()=>{if(!online.active&&(sim.running||countdown.running))togglePause();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
@@ -153,45 +153,102 @@ function frame(now){
  }
  draw();requestAnimationFrame(frame);
 }
+const SVGNS='http://www.w3.org/2000/svg';
+let startSelected=null,startActions=null;
+function fieldBackdrop(){
+ const {FIELD,W,H,hubs,bumps,trenches,TOWER}=globalThis.FieldPhysics,f=n=>+n.toFixed(3),sl=FIELD.startLine;
+ const label=(x,y,t,size=.26,rot=0,fill='#ffffff70')=>`<text x="${f(x)}" y="${f(y)}" font-size="${size}" fill="${fill}" text-anchor="middle" dominant-baseline="middle" letter-spacing=".04" transform="rotate(${rot} ${f(x)} ${f(y)})">${t}</text>`;
+ let g=`<defs><pattern id="bumpHatch" width=".28" height=".28" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width=".28" height=".28" fill="#6d5a3a"/><rect width=".12" height=".28" fill="#a88b54"/></pattern><pattern id="trenchHatch" width=".3" height=".3" patternUnits="userSpaceOnUse"><rect width=".3" height=".3" fill="#171220"/><path d="M0 .3L.3 0" stroke="#3a2f4d" stroke-width=".05"/></pattern></defs>`;
+ g+=`<rect width="${W}" height="${H}" fill="#2f2840"/><rect width="${sl}" height="${H}" fill="#223763"/><rect x="${f(W-sl)}" width="${sl}" height="${H}" fill="#66303d"/>`;
+ g+=`<g stroke="#ffffff12" stroke-width=".02">${Array.from({length:16},(_,i)=>`<path d="M${i+1} 0V${H}"/>`).join('')}${Array.from({length:7},(_,i)=>`<path d="M0 ${i+1}H${W}"/>`).join('')}</g>`;
+ g+=`<rect width=".14" height="${H}" fill="#4a7bd0"/><rect x="${f(W-.14)}" width=".14" height="${H}" fill="#d0566a"/>`;
+ // Neutral-zone fuel pile
+ const dots=[];for(let i=0;i<9;i++)for(let j=0;j<22;j++)dots.push(`<circle cx="${f(W/2-FIELD.centerDepth/2+.1+i*(FIELD.centerDepth-.2)/8)}" cy="${f(H/2-FIELD.centerWidth/2+.1+j*(FIELD.centerWidth-.2)/21)}" r=".06"/>`);
+ g+=`<rect x="${f(W/2-FIELD.centerDepth/2)}" y="${f(H/2-FIELD.centerWidth/2)}" width="${FIELD.centerDepth}" height="${FIELD.centerWidth}" fill="#f4df8714" stroke="#f4df8760" stroke-width=".04" stroke-dasharray=".16 .1"/><g fill="#f4df8780">${dots.join('')}</g>${label(W/2,H/2,'FUEL',.3,-90,'#f4df87aa')}`;
+ g+=`<path d="M${W/2} 0V${H}" stroke="#ffffff55" stroke-width=".04"/>`;
+ for(const t of trenches){const x=t.x-t.width/2,y=t.y-t.depth/2;g+=`<rect x="${f(x)}" y="${f(y)}" width="${t.width}" height="${t.depth}" fill="url(#trenchHatch)" stroke="#a48fc4" stroke-width=".04"/>${label(t.x,t.y,'TRENCH',.22,0,'#d9c8f2')}`;}
+ for(const b of bumps)g+=`<rect x="${f(b.x-b.width/2)}" y="${f(b.y-b.depth/2)}" width="${b.width}" height="${b.depth}" rx=".08" fill="url(#bumpHatch)" stroke="#e0bf7a" stroke-width=".04"/>${label(b.x,b.y,'BUMP',.24,-90,'#fff3d0')}`;
+ for(const h of hubs){const s=FIELD.hubSize;g+=`<rect x="${f(h.x-s/2)}" y="${f(h.y-s/2)}" width="${s}" height="${s}" rx=".06" fill="#4f3f6b" stroke="#c9b6ee" stroke-width=".05"/><circle cx="${h.x}" cy="${h.y}" r="${FIELD.openingRadius}" fill="#1d1629" stroke="#f4df87" stroke-width=".05"/>${label(h.x,h.y,'HUB',.24,0,'#f4df87')}`;}
+ for(const [side,x0] of [['blue',0],['red',W-TOWER.depth]])g+=`<rect x="${f(x0)}" y="${f(H/2-TOWER.width/2)}" width="${TOWER.depth}" height="${TOWER.width}" fill="#ffffff10" stroke="#ffffff55" stroke-width=".03"/><path d="M${f(x0)} ${f(H/2-TOWER.postGap/2)}H${f(x0+TOWER.depth)}M${f(x0)} ${f(H/2+TOWER.postGap/2)}H${f(x0+TOWER.depth)}" stroke="#ffffff90" stroke-width=".05"/>${label(x0+TOWER.depth/2,H/2,'TOWER',.2,0,'#ffffffa0')}`;
+ for(const x of [sl,W-sl])g+=`<path d="M${f(x)} 0V${H}" stroke="#f4df87" stroke-width=".07"/>`;
+ g+=label(sl/2+.2,.4,'BLUE ZONE',.26,0,'#9fc0f5')+label(W-sl/2-.2,.4,'RED ZONE',.26,0,'#f0a5b1')+label(sl-.25,H-.55,'START LINE',.22,-90,'#f4df87')+label(W-sl+.25,H-.55,'START LINE',.22,-90,'#f4df87');
+ return g;
+}
 function renderStartLayout(){
  const section=$('startLayoutSection'),field=$('startLayout');
  const room=online.active&&online.room?.status==='lobby'?online.room:null;
  section.hidden=onlineMode&&!room;if(section.hidden)return;
- let preview,editable,alliance;
- if(room){preview=createHostSimulation(room);const me=online.self;alliance=me?.alliance||'blue';editable=new Set([me?.team,...(me?.aiTeams||[])]);}
+ let preview,editable,alliance,ownTeam;
+ if(room){preview=createHostSimulation(room);const me=online.self;alliance=me?.alliance||'blue';ownTeam=me?.team;editable=new Set([me?.team,...(me?.aiTeams||[])]);}
  else {
-  alliance='blue';const mode=$('soloMatch').value;
+  alliance='blue';ownTeam=selectedTeam;const mode=$('soloMatch').value;
   if(['3v3solo','3v0'].includes(mode))preview=createHostSimulation({mode,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});
   else {preview=new Simulation(resolvePreset(selectedTeam));if($('aiDefender').checked)preview.enableMultiplayer([resolvePreset(selectedTeam),resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red')]);}
-  preview.roster=preview.roster.map(c=>({...c,startY:soloStartPositions[c.team]}));preview.reset();editable=new Set(preview.fleet.filter(e=>e.config.alliance==='blue').map(e=>e.config.team));
+  preview.roster=preview.roster.map(c=>({...c,...startFields(soloStartPositions[c.team])}));preview.reset();editable=new Set(preview.fleet.filter(e=>e.config.alliance==='blue').map(e=>e.config.team));
  }
+ const {W,H,startPlacement,obbOverlap}=globalThis.FieldPhysics;
  field.replaceChildren();
+ const svg=document.createElementNS(SVGNS,'svg');svg.setAttribute('viewBox',`0 0 ${W} ${H}`);svg.innerHTML=fieldBackdrop();field.append(svg);
+ const node=(tag,attrs,parent)=>{const n=document.createElementNS(SVGNS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(parent)parent.append(n);return n;};
+ const station=node('g',{'pointer-events':'none'},svg);
+ const ownEntry=preview.fleet.find(e=>e.config.team===ownTeam&&e.config.alliance===alliance);
+ const ownBlue=alliance==='blue';
+ node('rect',{x:ownBlue?0:W-.3,y:-.4,width:.3,height:.8,fill:'#f4df87',rx:.04},station);
+ const stationLabel=node('text',{'font-size':.18,fill:'#2a2236','text-anchor':'middle','font-weight':'bold',transform:`translate(${ownBlue?.17:W-.13} 0) rotate(-90)`},station);stationLabel.textContent='DRIVER';
+ const placeStation=y=>station.setAttribute('transform',`translate(0 ${y})`);
+ if(ownEntry)placeStation(ownEntry.robot.y);else station.setAttribute('visibility','hidden');
+ const headingName=(c,a)=>{const toward=c.alliance==='blue'?0:Math.PI,d=Math.atan2(Math.sin(a-toward),Math.cos(a-toward));return Math.abs(d)<.1?'facing the field':Math.abs(Math.abs(d)-Math.PI)<.1?'facing its wall':d>0?'facing down the line':'facing up the line';};
+ const tandemNote=()=>{const mine=preview.fleet.filter(e=>e.config.alliance===alliance&&editable.has(e.config.team));
+  for(const a of mine)for(const b of mine){if(a===b||a.config.team>b.config.team)continue;const ra=a.robot,rb=b.robot;
+   if(Math.abs(Math.sin(ra.a))>.99&&Math.abs(Math.sin(rb.a))>.99&&Math.cos(ra.a-rb.a)>.99&&Math.abs(rb.y-ra.y)-(a.config.length+b.config.length)/2<=.25){const lead=(ra.y-rb.y)*Math.sin(ra.a)>0?a:b,follow=lead===a?b:a;
+    const lt=canUseTrench(lead.config),ft=canUseTrench(follow.config),second=lt&&!ft?`${lead.config.team} takes the trench and ${follow.config.team} the bump`:ft?`${lead.config.team} takes the bump and ${follow.config.team} the trench`:`both take bumps (neither fits the trench)`;
+    return ` Tandem: ${lead.config.team} leads and ${follow.config.team} follows through one lane on pass 1, then on pass 2 ${second}.`;}}
+  return '';};
+ const entries=[];
  for(const entry of preview.fleet){
-  const c=entry.config,r=entry.robot,button=document.createElement('button');button.type='button';button.className='start-robot '+c.alliance;button.textContent=c.team;button.style.left=(r.x/16.54*100)+'%';button.style.top=(r.y/8.07*100)+'%';button.style.width=(c.length/16.54*100)+'%';button.style.height=(c.width/8.07*100)+'%';
-  const canEdit=c.alliance===alliance&&editable.has(c.team);button.disabled=!canEdit;button.setAttribute('aria-label',`Team ${c.team} starting position; drag, or use up and down arrows`);
-  const peers=preview.fleet.filter(o=>o!==entry&&o.config.alliance===c.alliance),lo=Math.max(.5,c.width/2),hi=Math.min(7.57,8.07-c.width/2),gap=o=>(o.config.width+c.width)/2+.05;
-  const free=y=>peers.every(o=>Math.abs(y-o.robot.y)>=gap(o)-1e-9);
-  // Clamp to the wall, then slide to the nearest open slot so a drag never snaps back.
-  const settle=want=>{want=Math.max(lo,Math.min(hi,want));if(free(want))return want;
-   const options=[lo,hi,...peers.flatMap(o=>[o.robot.y-gap(o),o.robot.y+gap(o)])].filter(y=>y>=lo-1e-9&&y<=hi+1e-9&&free(y));
-   return options.length?options.reduce((a,b)=>Math.abs(b-want)<Math.abs(a-want)?b:a):null;};
-  const station=document.createElement('span');station.className='start-station '+c.alliance;station.hidden=!canEdit;station.title='Driver station';station.setAttribute('aria-hidden','true');
-  const place=y=>{r.y=y;r.startY=y;button.style.top=(y/8.07*100)+'%';station.style.top=(y/8.07*100)+'%';};
-  const commit=()=>{$('startLayoutMessage').textContent=`Team ${c.team} starts at ${(r.y).toFixed(2)} m. The driver station view lines up with it.`;if(room)online.send({type:'start_position',team:c.team,y:r.y});else{soloStartPositions[c.team]=r.y;if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){sim.roster[0].startY=r.y;sim.reset();}}};
-  place(r.y);
-  if(canEdit){
-   let dragging=false;const pointerY=e=>{const rect=field.getBoundingClientRect();return (e.clientY-rect.top)/rect.height*8.07;};
-   const move=y=>{const next=settle(y);if(next===null){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}place(next);return true;};
-   button.addEventListener('pointerdown',e=>{e.preventDefault();dragging=true;button.setPointerCapture(e.pointerId);button.classList.add('dragging');button.focus();});
-   button.addEventListener('pointermove',e=>{if(dragging)move(pointerY(e));});
-   const finish=e=>{if(!dragging)return;dragging=false;button.classList.remove('dragging');if(e.type==='pointerup')move(pointerY(e));commit();};
-   button.addEventListener('pointerup',finish);button.addEventListener('pointercancel',finish);
-   button.addEventListener('keydown',e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();if(move(r.y+(e.key==='ArrowUp'?-.1:.1)))commit();}});
-  }
-  field.append(station);
-  field.append(button);
+  const c=entry.config,r=entry.robot,blue=c.alliance==='blue',canEdit=c.alliance===alliance&&editable.has(c.team);
+  const g=node('g',{class:'start-robot '+(canEdit?'':'locked'),tabindex:canEdit?0:-1,role:'button','aria-label':`Team ${c.team} starting position; drag, or use up and down arrows. R rotates.`},svg);
+  const tint=blue?['#3c6ca4','#8db5ec']:['#a24755','#f0919f'];
+  node('rect',{class:'chassis',x:-c.length/2,y:-c.width/2,width:c.length,height:c.width,rx:.06,fill:tint[0],stroke:tint[1]},g);
+  node('rect',{x:-c.length/2+.1,y:-c.width/2+.1,width:c.length-.2,height:c.width-.2,rx:.03,fill:'#0000002e','pointer-events':'none'},g);
+  node('rect',{x:c.length/2-.07,y:-c.width/2+.04,width:.1,height:c.width-.08,rx:.04,fill:'#fff','pointer-events':'none'},g);
+  node('path',{d:`M${c.length/2-.3} ${-c.width*.22}L${c.length/2-.12} 0L${c.length/2-.3} ${c.width*.22}Z`,fill:'#ffffffd0','pointer-events':'none'},g);
+  const text=node('text',{'font-size':Math.min(.3,c.width*.36,c.length*.3),fill:'#fff','font-weight':'bold','text-anchor':'middle','dominant-baseline':'middle','pointer-events':'none'},g);text.textContent=c.team;
+  const title=node('title',{},g);title.textContent=`${c.team}${canEdit?'':' (locked)'}`;
+  const paint=()=>{const deg=r.a*180/Math.PI;g.setAttribute('transform',`translate(${r.x} ${r.y}) rotate(${deg})`);text.setAttribute('transform',`rotate(${-deg})`);if(entry===ownEntry)placeStation(r.y);};
+  const peers=preview.fleet.filter(o=>o!==entry&&o.config.alliance===c.alliance);
+  const free=(y,a)=>{const e=startPlacement(c,a,blue),p={x:e.x,y,a,length:c.length,width:c.width};return peers.every(o=>!obbOverlap(p,{x:o.robot.x,y:o.robot.y,a:o.robot.a,length:o.config.length,width:o.config.width}));};
+  // Clamp to the walls, snap bumper to bumper (or bumper to wall) when close, otherwise slide to the nearest open slot.
+  const settle=(want,a)=>{const e=startPlacement(c,a,blue),lo=e.ey,hi=H-e.ey;want=Math.max(lo,Math.min(hi,want));
+   const options=[lo,hi,...peers.flatMap(o=>{const oe=startPlacement(o.config,o.robot.a,blue);return [o.robot.y-oe.ey-e.ey,o.robot.y+oe.ey+e.ey];})].filter(y=>y>=lo-1e-9&&y<=hi+1e-9&&free(y,a));
+   const nearest=options.reduce((best,y)=>best===undefined||Math.abs(y-want)<Math.abs(best-want)?y:best,undefined);
+   if(nearest!==undefined&&Math.abs(nearest-want)<.18)return nearest;
+   if(free(want,a))return want;
+   return nearest===undefined?null:nearest;};
+  const apply=(y,a)=>{const e=startPlacement(c,a,blue);r.y=y;r.a=a;r.x=e.x;r.startY=y;r.startA=a;paint();};
+  const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts at ${r.y.toFixed(2)} m, ${headingName(c,r.a)}, touching the start line. The driver station view lines up with it.${tandemNote()}`;
+   if(room)online.send({type:'start_position',team:c.team,y:r.y,a:r.a});else{soloStartPositions[c.team]={y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
+  paint();entries.push({g,entry});
+  if(!canEdit)continue;
+  const select=()=>{startSelected=c.team;for(const o of entries)o.g.classList.toggle('selected',o.entry===entry);$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;
+   startActions={rotate:dir=>{const a=Math.atan2(Math.sin(r.a+dir*Math.PI/2),Math.cos(r.a+dir*Math.PI/2)),y=settle(r.y,a);if(y===null){$('startLayoutMessage').textContent='No room to rotate there. Move a teammate first.';return;}apply(y,a);commit();},
+    flip:()=>{const a=Math.atan2(Math.sin(r.a+Math.PI),Math.cos(r.a+Math.PI)),y=settle(r.y,a);if(y===null)return;apply(y,a);commit();}};};
+  if(startSelected===c.team)select();
+  let dragging=false;const pointerY=e=>{const rect=svg.getBoundingClientRect();return (e.clientY-rect.top)/rect.height*H;};
+  const move=y=>{const next=settle(y,r.a);if(next===null){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}apply(next,r.a);return true;};
+  g.addEventListener('pointerdown',e=>{e.preventDefault();select();dragging=true;g.setPointerCapture(e.pointerId);g.classList.add('dragging');g.focus();});
+  g.addEventListener('pointermove',e=>{if(dragging)move(pointerY(e));});
+  const finish=e=>{if(!dragging)return;dragging=false;g.classList.remove('dragging');if(e.type==='pointerup')move(pointerY(e));commit();};
+  g.addEventListener('pointerup',finish);g.addEventListener('pointercancel',finish);
+  g.addEventListener('focus',select);
+  g.addEventListener('keydown',e=>{
+   if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();if(move(r.y+(e.key==='ArrowUp'?-1:1)*(e.shiftKey?.02:.1)))commit();}
+   else if(e.code==='KeyR'){e.preventDefault();e.stopPropagation();startActions?.rotate(e.shiftKey?-1:1);}
+  });
  }
+ if(!entries.some(o=>o.entry.config.team===startSelected&&editable.has(o.entry.config.team))){startSelected=null;startActions=null;$('startSelected').textContent='Select a robot';}
 }
+$('startRotL').onclick=()=>startActions?.rotate(-1);$('startRotR').onclick=()=>startActions?.rotate(1);$('startFlip').onclick=()=>startActions?.flip();
 function renderAiSelections(){
  const box=$('aiSelections'),inRoom=onlineMode&&['3v3','3v3coop'].includes(online.room?.mode)&&online.room.status==='lobby',solo=!onlineMode&&['3v3solo','3v0'].includes($('soloMatch').value);
  box.hidden=!(inRoom||solo);if(box.hidden){box.replaceChildren();for(const button of $('robotChoices').children)button.disabled=false;renderStartLayout();return;}
@@ -209,7 +266,7 @@ function renderAiSelections(){
 function previewLobby(){
  const room=online.room;if(!room||room.status!=='lobby')return;
  sim.multiplayer=false;sim.activeIndex=Math.max(0,room.players.findIndex(p=>p.id===online.id));
- sim.roster=room.players.map(p=>({...resolvePreset(p.team,p.alliance),startY:p.startPositions?.[p.team]}));sim.reset();
+ sim.roster=room.players.map(p=>({...resolvePreset(p.team,p.alliance),...startFields(p.startPositions?.[p.team])}));sim.reset();
  const me=online.self;if(me)selectedTeam=me.team;
  for(const button of $('robotChoices').children){const active=button.dataset.team===selectedTeam;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));}
  $('netDetails').textContent=`${sim.config.capacity} capacity · Starts at ${canUseTrench(sim.config)?'trench':'bump'}`;

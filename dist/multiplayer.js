@@ -1,8 +1,10 @@
-import {defenderInput} from './defender.js?v=traffic31';
+import {defenderInput} from './defender.js?v=tandem34';
+
+export const startFields=pose=>pose&&Number.isFinite(pose.y)?{startY:pose.y,startA:pose.a}:{};
 
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
-  const roster=room.players.map(p=>({...resolve(p.team,p.alliance),startY:p.startPositions?.[p.team]}));
+  const roster=room.players.map(p=>({...resolve(p.team,p.alliance),...startFields(p.startPositions?.[p.team])}));
   const size=room.mode==='3v3'||room.mode==='3v3solo'||room.mode==='3v3coop'||room.mode==='3v0'?3:room.mode==='2v2'?2:0;
   const used=new Set(roster.map(c=>c.team)),pool=Object.keys(globalThis.TeamPresets.profiles);
   if(size)for(const alliance of ['blue','red']){
@@ -13,7 +15,7 @@ export function createHostSimulation(room){
       const proposed=room.aiTeams?.[alliance]?.[slot]??owner?.aiTeams?.[slot];
       const candidate=proposed||'2539',chosen=!used.has(candidate)?candidate:pool.find(id=>!used.has(id));used.add(chosen);
       const role=room.aiRoles?.[alliance]?.[slot]??owner?.aiRoles?.[slot]??'auto';
-      roster.push({...resolve(chosen,alliance),aiRole:role,startY:owner?.startPositions?.[chosen]});
+      roster.push({...resolve(chosen,alliance),aiRole:role,...startFields(owner?.startPositions?.[chosen])});
     }
   }
   const sim=new Simulation();sim.enableMultiplayer(roster);return sim;

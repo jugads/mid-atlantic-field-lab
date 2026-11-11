@@ -81,8 +81,8 @@ class Rooms{
       p.aiRoles[msg.slot]=msg.role;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='start_position'){
-      if(room.status!=='lobby'||typeof msg.team!=='string'||![p.team,...p.aiTeams.slice(0,aiSlots(room.mode,room.players.indexOf(p)))].includes(msg.team)||!Number.isFinite(msg.y)||msg.y<.5||msg.y>7.57)return this.fail(socket,'Invalid starting position.');
-      p.startPositions=p.startPositions||{};p.startPositions[msg.team]=msg.y;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
+      if(room.status!=='lobby'||typeof msg.team!=='string'||![p.team,...p.aiTeams.slice(0,aiSlots(room.mode,room.players.indexOf(p)))].includes(msg.team)||!Number.isFinite(msg.y)||msg.y<.3||msg.y>7.77||(msg.a!==undefined&&!Number.isFinite(msg.a)))return this.fail(socket,'Invalid starting position.');
+      p.startPositions=p.startPositions||{};p.startPositions[msg.team]={y:msg.y,a:Number.isFinite(msg.a)?Math.atan2(Math.sin(msg.a),Math.cos(msg.a)):undefined};for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='ready'){
       if(room.status!=='lobby')return;

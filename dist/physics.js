@@ -80,6 +80,20 @@
     }
     return best;
   }
+  // Robot footprint when parked with its outermost edge touching the alliance start line.
+  function startPlacement(c,a,blue){
+    const ex=Math.abs(Math.cos(a))*c.length/2+Math.abs(Math.sin(a))*c.width/2,ey=Math.abs(Math.sin(a))*c.length/2+Math.abs(Math.cos(a))*c.width/2;
+    return {ex,ey,x:blue?FIELD.startLine-ex:W-FIELD.startLine+ex};
+  }
+  // Oriented-rectangle overlap for parked robots; touching bumpers do not count as overlap.
+  function obbOverlap(p,q){
+    const axes=[p.a,p.a+Math.PI/2,q.a,q.a+Math.PI/2].map(t=>[Math.cos(t),Math.sin(t)]);
+    for(const [nx,ny] of axes){
+      const ext=o=>Math.abs(nx*Math.cos(o.a)+ny*Math.sin(o.a))*o.length/2+Math.abs(-nx*Math.sin(o.a)+ny*Math.cos(o.a))*o.width/2;
+      if(Math.abs((p.x-q.x)*nx+(p.y-q.y)*ny)>=ext(p)+ext(q)-1e-6)return false;
+    }
+    return true;
+  }
   const ROBOT_STATE=['nextTurret','inventory','intake','intakeClock','fireClock','feedBudget','feedThreshold','aimController','turretController','turretAngle'];
   class Simulation {
     constructor(config={},random=Math.random){this.config={...base,...config};this.random=random;this.roster=[{...this.config}];this.activeIndex=0;this.reset();}
@@ -87,15 +101,26 @@
       this.config={...this.roster[this.activeIndex]};
       const occupied={blue:[],red:[]};this.fleet=this.roster.map(config=>{
         const c={...config},blue=c.alliance==='blue',candidates=startingLocations(c),used=occupied[c.alliance];
-        // Reserve separate lanes for each parked robot in a multi-robot simulation.
-        const requested=Number.isFinite(c.startY)?Math.max(c.width/2,Math.min(H-c.width/2,c.startY)):null;
-        const valid=y=>used.every(o=>Math.abs(y-o.y)>=(c.width+o.width)/2+.05);
-        const position=requested!==null&&valid(requested)?{y:requested,area:'custom'}:candidates.find(p=>valid(p.y))||candidates[0];
-        used.push({y:position.y,width:c.width});
-        const robot={x:blue?FIELD.startLine-c.length/2:W-FIELD.startLine+c.length/2,
-          y:position.y,startY:position.y,startArea:position.area,a:blue?0:Math.PI,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
+        // A custom pose must touch the start line and may not overlap a teammate. Otherwise reserve a default lane.
+        const pose=(y,a)=>{const e=startPlacement(c,a,blue);return {x:e.x,y:Math.max(e.ey,Math.min(H-e.ey,y)),a,length:c.length,width:c.width};};
+        const valid=p=>used.every(o=>!obbOverlap(p,o));
+        const defaultA=blue?0:Math.PI;
+        let chosen=null,area='custom';
+        if(Number.isFinite(c.startY)){const p=pose(c.startY,Number.isFinite(c.startA)?c.startA:defaultA);if(valid(p))chosen=p;}
+        if(!chosen){const found=candidates.map(q=>({q,p:pose(q.y,defaultA)})).find(o=>valid(o.p))||{q:candidates[0],p:pose(candidates[0].y,defaultA)};chosen=found.p;area=found.q.area;}
+        used.push(chosen);
+        const robot={x:chosen.x,y:chosen.y,startY:chosen.y,startA:chosen.a,startArea:area,a:chosen.a,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
         return {config:c,robot,inventory:Math.min(8,c.capacity)};
       });
+      // Two robots parked bumper to bumper along the line run a follow-the-leader AUTO.
+      for(const [i,a] of this.fleet.entries())for(const [j,b] of this.fleet.entries()){
+        if(i>=j||a.config.alliance!==b.config.alliance)continue;
+        const ra=a.robot,rb=b.robot,alongLine=Math.abs(Math.sin(ra.a))>.99&&Math.abs(Math.sin(rb.a))>.99&&Math.cos(ra.a-rb.a)>.99;
+        const gap=Math.abs(rb.y-ra.y)-(a.config.length+b.config.length)/2;
+        if(!alongLine||gap>.25)continue;
+        const aLeads=(ra.y-rb.y)*Math.sin(ra.a)>0;
+        a.tandem={partner:j,lead:aLeads};b.tandem={partner:i,lead:!aLeads};
+      }
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
       const c=this.config;
       this.score=0;this.scores={blue:0,red:0};this.autoScores={blue:0,red:0};
@@ -622,6 +647,6 @@
       if(this.time>=166-1e-8){this.time=166;this.running=false;for(const entry of this.fleet){entry.robot.vx=0;entry.robot.vy=0;}}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,startPlacement,obbOverlap,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);

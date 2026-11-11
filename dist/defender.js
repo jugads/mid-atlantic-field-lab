@@ -49,7 +49,20 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
         // send us over the adjacent bump rather than into an endless push.
         const lanes = crossingLanes;
         const hubX = red ? 16.54 - 4.03 - 1.194 / 2 : 4.03 + 1.194 / 2;
-        const lane = lanes.reduce((best, y) => {
+        // Tandem start: follow the leader on the first pass, then split (one bump, one trench) on the second.
+        const tandem = sim.phase.id === 'auto' ? defender.tandem : null;
+        let tandemLane = null;
+        if (tandem) {
+          const partner = sim.fleet[tandem.partner], partnerTrench = globalThis.FieldPhysics?.canUseTrench?.(partner.config) ?? false;
+          const bumpLanes = [2.51, 8.07 - 2.51], trenchLanes = [.69, 8.07 - .69], pass = state.autoCrossings || 0;
+          const nearest = (list, y) => list.reduce((best, v) => Math.abs(v - y) < Math.abs(best - y) ? v : best);
+          if (pass === 0) {
+            const shared = canCrossTrench && partnerTrench ? lanes : bumpLanes, leadIndex = tandem.lead ? botIndex : tandem.partner;
+            tandemLane = tandem.lead || states.get(leadIndex)?.autoLanes?.[0] === undefined ? nearest(shared, sim.fleet[leadIndex].robot.y) : states.get(leadIndex).autoLanes[0];
+          } else tandemLane = canCrossTrench && (!partnerTrench || !tandem.lead) ? nearest(trenchLanes, r.y) : nearest(bumpLanes, r.y);
+          if (pass === 0) (state.autoLanes ||= []).push(tandemLane);
+        }
+        const lane = tandemLane ?? lanes.reduce((best, y) => {
           const cost = v => {
             const traffic = sim.fleet.reduce((sum, entry, index) => {
               if (index === botIndex || !entry.robot) return sum;
@@ -83,7 +96,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
         return crossTrench(towardHome);
       }
       const passed = dir > 0 ? r.x >= route.exit - .10 : r.x <= route.exit + .10;
-      if (passed) { state.route = null; return null; }
+      if (passed) { if (sim.phase.id === 'auto') state.autoCrossings = (state.autoCrossings || 0) + 1; state.route = null; return null; }
       // Approach diagonally at full speed and start the short trench turn
       // during the approach, rather than braking at an intermediate waypoint.
       const entryClear = dir > 0 ? r.x <= route.entry + .12 : r.x >= route.entry - .12;
