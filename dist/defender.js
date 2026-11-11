@@ -193,7 +193,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
   let ds = states.get(botIndex); if (!ds || sim.time < ds.lastTime) { ds = { lastTime: sim.time, stuckSince: null, backoffUntil: 0, bypass: null }; states.set(botIndex, ds); } ds.lastTime = sim.time;
   // Easier defense makes decisions from less frequent observations, while
   // every level retains the same maximum drive speed and acceleration.
-  const reaction = easy ? .65 : hard ? 0 : .25;
+  const reaction = easy ? .95 : hard ? 0 : .25;
   if (!ds.observed || sim.time < ds.observedAt || sim.time - ds.observedAt >= reaction) {
     ds.observed = {x: player.x, y: player.y, vx: player.vx, vy: player.vy}; ds.observedAt = sim.time;
   }
@@ -217,6 +217,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     if (path.stage === 2) { if (Math.abs(r.x - path.exit) > .3) return driveTo(path.exit, path.lane, false, 1); ds.bypass = null; }
   }
   const bumpOnly = enemy && (enemy.height > .5652 || enemy.width > 1.30);
+  if (hard && bumpOnly && Math.abs(player.x - hubX) < 3 && Math.abs(r.x - hubX) < 2.7) r.defensePush = 1.14;
   // Defend the scoring zone when it has enough loose fuel for the opponent;
   // otherwise protect the bump to interrupt their next neutral-zone trip.
   if (bumpOnly && (!Number.isFinite(ds.zoneCheckedAt) || sim.time - ds.zoneCheckedAt > .5)) {
@@ -252,7 +253,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     // release above rather than driving it across the field indefinitely.
     if (!ds.bumpAnchor && distance < 1.25) ds.bumpAnchor = {x: player.x, y: player.y};
     const pushed = ds.bumpAnchor ? ((player.x - ds.bumpAnchor.x) * -dx + (player.y - ds.bumpAnchor.y) * -dy) / distance : 0;
-    const throttle = hard ? (pushed < .8 ? 1 : .25) : (distance > 1.2 ? .7 : .25);
+    const throttle = hard ? (pushed < 1 ? 1 : .35) : (distance > 1.2 ? (easy ? .45 : .7) : (easy ? .1 : .25));
     // Keep the bumper square to resist being deflected around the side.
     const e0 = Math.atan2(Math.sin(-r.a), Math.cos(-r.a)), e1 = Math.atan2(Math.sin(Math.PI-r.a), Math.cos(Math.PI-r.a));
     const error = Math.abs(e0) < Math.abs(e1) ? e0 : e1;
@@ -346,6 +347,13 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     }
     const heading = Math.atan2(ay, ax), err = Math.atan2(Math.sin(heading - r.a), Math.cos(heading - r.a));
     return { moveX: mx, moveY: my, turnAxis: Math.max(-1, Math.min(1, err * 1.5)), intake: true };
+  }
+  if (easy && distance < 1.8) {
+    // Easy defense closes the gap but eases off in contact, leaving a more
+    // forgiving route around the defender without slowing its scoring cycles.
+    const input = driveTo(ds.observed.x, ds.observed.y);
+    input.moveX = (input.moveX || 0) * .45; input.moveY = (input.moveY || 0) * .45;
+    return input;
   }
   return driveTo(ds.observed.x + ds.observed.vx * lead, ds.observed.y + ds.observed.vy * lead);
 }
