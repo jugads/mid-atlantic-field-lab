@@ -29,6 +29,16 @@ for (const team of ['708', '8513']) {
   const returning=defenderInput(s,'hard'); assert(!returning.shoot && returning.moveX>0,`${team} returns home without passing`);
 }
 console.log('Bump-only scorers collect and wait through inactive shifts');
+{
+  const cfg={alliance:'blue',length:.9,width:.8,height:.5,capacity:40,aiRole:'pass',archetype:'turret',maxRange:6};
+  const b={config:cfg,robot:{x:2,y:2.51,a:0},inventory:15};
+  const s={fleet:[{robot:{x:15,y:7,vx:0,vy:0}},b],phase:{id:'shift1',shift:true},phaseRemaining:15,activeAt:()=>false,time:40,balls:[]};
+  const leave=defenderInput(s); assert(leave.moveX>0 && !leave.shoot,'inactive passer leaves home with fuel');
+  b.robot.x=6; s.time++; const pass=defenderInput(s); assert(pass.shoot,'inactive passer fires outside home');
+  s.phase={id:'endgame'}; s.activeAt=()=>true; s.time++; assert(defenderInput(s).shoot,'endgame passer fires outside home');
+  b.robot.x=2; s.time++; assert(defenderInput(s).shoot,'endgame passer scores at home');
+}
+console.log('Passing role leaves home and shoots in inactive and endgame');
 // Exercise a full scoring cycle and a return from the far side using real physics.
 const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
 const {Simulation}=require('../dist/physics.js');const {resolve}=require('../dist/team-presets.js');
