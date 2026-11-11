@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=camera25';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=camera25';
+import {defenderInput,defenderTeam} from './defender.js?v=pass26';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=pass26';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
