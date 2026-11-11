@@ -1,4 +1,4 @@
-import {defenderInput} from './defender.js?v=tandem39';
+import {defenderInput} from './defender.js?v=tandem40';
 
 export const startFields=pose=>pose&&Number.isFinite(pose.y)?{startX:pose.x,startY:pose.y,startA:pose.a}:{};
 

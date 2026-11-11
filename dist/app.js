@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=tandem39';
-import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem39';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem40';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem40';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -237,7 +237,7 @@ function renderStartLayout(){
   const where=()=>underTrench(r.x,r.y,r.a)?'under the trench, back bumper on the start line':'touching the start line';
   const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts ${headingName(c,r.a)}, ${where()}. The driver station view lines up with it.${tandemNote()}`;
    if(room)online.send({type:'start_position',team:c.team,x:r.x,y:r.y,a:r.a});else{soloStartPositions[c.team]={x:r.x,y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
-  const api={cfg:c,r,apply,commit};entries.push({g,entry,api,canEdit});
+  paint();const api={cfg:c,r,apply,commit};entries.push({g,entry,api,canEdit});
   if(!canEdit)continue;
   const norm=a=>Math.atan2(Math.sin(a),Math.cos(a));
   const select=()=>{startSelected=c.team;for(const o of entries)o.g.classList.toggle('selected',o.entry===entry);$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;
