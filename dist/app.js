@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=tandem37';
-import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem37';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem38';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem38';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -36,7 +36,7 @@ function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.tea
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
-$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if(['3v3solo','3v0'].includes($('soloMatch').value)){const match=createHostSimulation({mode:$('soloMatch').value,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster.map(c=>({...c,...startFields(soloStartPositions[c.team])})));}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);if(!sim.multiplayer){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.reset();}else if($('soloMatch').value==='1v1'&&sim.fleet.length===2){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.enableMultiplayer(sim.roster);}countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
+$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if(['3v3solo','3v0'].includes($('soloMatch').value)){const match=createHostSimulation({mode:$('soloMatch').value,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster.map(c=>({...c,...(c.alliance==='blue'?startFields(soloStartPositions[c.team]):{})})));}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);if(!sim.multiplayer){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.reset();}else if($('soloMatch').value==='1v1'&&sim.fleet.length===2){Object.assign(sim.roster[0],startFields(soloStartPositions[selectedTeam]));sim.enableMultiplayer(sim.roster);}countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
 $('pause').onclick=togglePause;$('reset').onclick=reset;
 $('resultsButton').onclick=()=>{renderResults();$('resultsDialog').showModal();};$('closeResults').onclick=()=>$('resultsDialog').close();
 $('help').onclick=()=>{if(!online.active&&(sim.running||countdown.running))togglePause();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
@@ -183,8 +183,8 @@ function renderStartLayout(){
  else {
   alliance='blue';ownTeam=selectedTeam;const mode=$('soloMatch').value;
   if(['3v3solo','3v0'].includes(mode))preview=createHostSimulation({mode,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});
-  else {preview=new Simulation(resolvePreset(selectedTeam));if($('aiDefender').checked)preview.enableMultiplayer([resolvePreset(selectedTeam),resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red')]);}
-  preview.roster=preview.roster.map(c=>({...c,...startFields(soloStartPositions[c.team])}));preview.reset();editable=new Set(preview.fleet.filter(e=>e.config.alliance==='blue').map(e=>e.config.team));
+  else {preview=new Simulation(resolvePreset(selectedTeam));if($('aiDefender').checked)preview.enableMultiplayer([resolvePreset(selectedTeam),resolvePreset(defenderTeam($('defenderDifficulty').value),'red')]);}
+  preview.roster=preview.roster.map(c=>({...c,...(c.alliance==='blue'?startFields(soloStartPositions[c.team]):{})}));preview.reset();editable=new Set(preview.fleet.filter(e=>e.config.alliance==='blue').map(e=>e.config.team));
  }
  const {W,H,startPlacement,obbOverlap}=globalThis.FieldPhysics;
  field.replaceChildren();
@@ -247,7 +247,7 @@ function renderStartLayout(){
     stack:()=>{const mates=entries.filter(o=>o.entry!==entry&&o.canEdit).sort((p,q)=>Math.abs(p.api.r.y-r.y)-Math.abs(q.api.r.y-r.y));
      if(!mates.length){$('startLayoutMessage').textContent='Stacking needs a second robot you control.';return;}
      const o=mates[0].api,a=Math.PI/2,eS=startPlacement(c,a,blue),eO=startPlacement(o.cfg,a,blue),upper=r.y<=o.r.y?[eS,eO]:[eO,eS],span=2*eS.ey+2*eO.ey;
-     const top=Math.max(0,Math.min(H-span,(r.y+o.r.y)/2-span/2)),yUpper=top+upper[0].ey,yLower=top+span-upper[1].ey,mine=r.y<=o.r.y?[yUpper,yLower]:[yLower,yUpper];
+     const FP=globalThis.FieldPhysics.FIELD,bumpY=[H/2-FP.hubSize/2-FP.bumpWidth/2,H/2+FP.hubSize/2+FP.bumpWidth/2],mid=(r.y+o.r.y)/2,target=Math.abs(bumpY[0]-mid)<Math.abs(bumpY[1]-mid)?bumpY[0]:bumpY[1],top=Math.max(0,Math.min(H-span,target-span/2)),yUpper=top+upper[0].ey,yLower=top+span-upper[1].ey,mine=r.y<=o.r.y?[yUpper,yLower]:[yLower,yUpper];
      const others=peers.filter(p=>p!==mates[0].entry);
      const fits=others.every(p=>!obbOverlap({x:eS.x,y:mine[0],a,length:c.length,width:c.width},peerBox(p))&&!obbOverlap({x:eO.x,y:mine[1],a,length:o.cfg.length,width:o.cfg.width},peerBox(p)));
      if(!fits){$('startLayoutMessage').textContent='No room to stack there. Move a teammate first.';return;}

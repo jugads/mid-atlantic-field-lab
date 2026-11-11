@@ -43,7 +43,7 @@ class Rooms{
         if(room.status!=='lobby')return this.fail(socket,'This match has already started.');
       }
       const used=new Set(room.players.flatMap(driver=>[driver.team,...driver.aiTeams.slice(0,aiSlots(room.mode,room.players.indexOf(driver)))]));
-      let team=typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341';if(used.has(team))team=teamPool.find(id=>!used.has(id));used.add(team);
+      let team=typeof msg.team==='string'&&Object.hasOwn(profiles,msg.team)?msg.team:'341';if(used.has(team)&&room.mode!=='1v1')team=teamPool.find(id=>!used.has(id));used.add(team);
       const picks=[];for(let i=0;i<aiSlots(room.mode,room.players.length);i++){const choice=teamPool.find(id=>!used.has(id));picks.push(choice);used.add(choice);}
       const p={id:randomBytes(8).toString('hex'),token:randomBytes(24).toString('hex'),team,aiTeams:picks,aiRoles:picks.map(()=>'auto'),ready:false,socket};
       room.players.push(p);if(!room.hostId)room.hostId=p.id;socket.room=room;socket.player=p;this.welcome(room,p);return;
@@ -67,7 +67,7 @@ class Rooms{
     if(msg.type==='select'){
       if(room.status!=='lobby')return this.fail(socket,'Robot selection is locked during a match.');
       if(!Object.hasOwn(profiles,msg.team))return this.fail(socket,'Unknown robot.');
-      if(room.players.some(other=>(other!==p&&other.team===msg.team)||other.aiTeams.includes(msg.team)))return this.fail(socket,'That team is already in this match.');
+      if(room.mode!=='1v1'&&room.players.some(other=>(other!==p&&other.team===msg.team)||other.aiTeams.includes(msg.team)))return this.fail(socket,'That team is already in this match.');
       p.team=msg.team;for(const driver of room.players)driver.ready=false;this.broadcast(room);return;
     }
     if(msg.type==='select_ai'){
