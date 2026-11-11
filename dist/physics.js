@@ -94,6 +94,13 @@
     }
     return true;
   }
+  // Which of two parked robots leads a tandem (same heading, aligned, bumper to bumper), or null.
+  function tandemLead(a,b){
+    const ra=a.robot,rb=b.robot;if(Math.cos(ra.a-rb.a)<.99)return null;
+    const fx=Math.cos(ra.a),fy=Math.sin(ra.a),dx=rb.x-ra.x,dy=rb.y-ra.y,along=dx*fx+dy*fy;
+    if(Math.abs(-dx*fy+dy*fx)>.3||Math.abs(along)-(a.config.length+b.config.length)/2>.25)return null;
+    return along<0?a:b;
+  }
   const ROBOT_STATE=['nextTurret','inventory','intake','intakeClock','fireClock','feedBudget','feedThreshold','aimController','turretController','turretAngle'];
   class Simulation {
     constructor(config={},random=Math.random){this.config={...base,...config};this.random=random;this.roster=[{...this.config}];this.activeIndex=0;this.reset();}
@@ -102,24 +109,21 @@
       const occupied={blue:[],red:[]};this.fleet=this.roster.map(config=>{
         const c={...config},blue=c.alliance==='blue',candidates=startingLocations(c),used=occupied[c.alliance];
         // A custom pose must touch the start line and may not overlap a teammate. Otherwise reserve a default lane.
-        const pose=(y,a)=>{const e=startPlacement(c,a,blue);return {x:e.x,y:Math.max(e.ey,Math.min(H-e.ey,y)),a,length:c.length,width:c.width};};
+        const pose=(y,a,x)=>{const e=startPlacement(c,a,blue),lo=blue?e.ex:W-FIELD.startLine+e.ex,hi=blue?FIELD.startLine-e.ex:W-e.ex;return {x:Number.isFinite(x)?Math.max(lo,Math.min(hi,x)):e.x,y:Math.max(e.ey,Math.min(H-e.ey,y)),a,length:c.length,width:c.width};};
         const valid=p=>used.every(o=>!obbOverlap(p,o));
         const defaultA=blue?0:Math.PI;
         let chosen=null,area='custom';
-        if(Number.isFinite(c.startY)){const p=pose(c.startY,Number.isFinite(c.startA)?c.startA:defaultA);if(valid(p))chosen=p;}
+        if(Number.isFinite(c.startY)){const p=pose(c.startY,Number.isFinite(c.startA)?c.startA:defaultA,c.startX);if(valid(p))chosen=p;}
         if(!chosen){const found=candidates.map(q=>({q,p:pose(q.y,defaultA)})).find(o=>valid(o.p))||{q:candidates[0],p:pose(candidates[0].y,defaultA)};chosen=found.p;area=found.q.area;}
         used.push(chosen);
-        const robot={x:chosen.x,y:chosen.y,startY:chosen.y,startA:chosen.a,startArea:area,a:chosen.a,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
+        const robot={x:chosen.x,y:chosen.y,startX:chosen.x,startY:chosen.y,startA:chosen.a,startArea:area,a:chosen.a,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
         return {config:c,robot,inventory:Math.min(8,c.capacity)};
       });
-      // Two robots parked bumper to bumper along the line run a follow-the-leader AUTO.
+      // Two robots parked bumper to bumper, facing the same way, run a follow-the-leader AUTO.
       for(const [i,a] of this.fleet.entries())for(const [j,b] of this.fleet.entries()){
         if(i>=j||a.config.alliance!==b.config.alliance)continue;
-        const ra=a.robot,rb=b.robot,alongLine=Math.abs(Math.sin(ra.a))>.99&&Math.abs(Math.sin(rb.a))>.99&&Math.cos(ra.a-rb.a)>.99;
-        const gap=Math.abs(rb.y-ra.y)-(a.config.length+b.config.length)/2;
-        if(!alongLine||gap>.25)continue;
-        const aLeads=(ra.y-rb.y)*Math.sin(ra.a)>0;
-        a.tandem={partner:j,lead:aLeads};b.tandem={partner:i,lead:!aLeads};
+        const lead=tandemLead(a,b);if(!lead)continue;
+        a.tandem={partner:j,lead:lead===a};b.tandem={partner:i,lead:lead===b};
       }
       this.robot=this.fleet[this.activeIndex].robot;this.inventory=this.fleet[this.activeIndex].inventory;
       const c=this.config;
@@ -647,6 +651,6 @@
       if(this.time>=166-1e-8){this.time=166;this.running=false;for(const entry of this.fleet){entry.robot.vx=0;entry.robot.vy=0;}}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,startPlacement,obbOverlap,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,startPlacement,obbOverlap,tandemLead,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);

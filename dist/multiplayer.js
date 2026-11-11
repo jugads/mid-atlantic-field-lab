@@ -1,6 +1,6 @@
-import {defenderInput} from './defender.js?v=tandem34';
+import {defenderInput} from './defender.js?v=tandem35';
 
-export const startFields=pose=>pose&&Number.isFinite(pose.y)?{startY:pose.y,startA:pose.a}:{};
+export const startFields=pose=>pose&&Number.isFinite(pose.y)?{startX:pose.x,startY:pose.y,startA:pose.a}:{};
 
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;

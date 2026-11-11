@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=tandem34';
-import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem34';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem35';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem35';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -199,10 +199,9 @@ function renderStartLayout(){
  if(ownEntry)placeStation(ownEntry.robot.y);else station.setAttribute('visibility','hidden');
  const headingName=(c,a)=>{const toward=c.alliance==='blue'?0:Math.PI,d=Math.atan2(Math.sin(a-toward),Math.cos(a-toward));return Math.abs(d)<.1?'facing the field':Math.abs(Math.abs(d)-Math.PI)<.1?'facing its wall':d>0?'facing down the line':'facing up the line';};
  const tandemNote=()=>{const mine=preview.fleet.filter(e=>e.config.alliance===alliance&&editable.has(e.config.team));
-  for(const a of mine)for(const b of mine){if(a===b||a.config.team>b.config.team)continue;const ra=a.robot,rb=b.robot;
-   if(Math.abs(Math.sin(ra.a))>.99&&Math.abs(Math.sin(rb.a))>.99&&Math.cos(ra.a-rb.a)>.99&&Math.abs(rb.y-ra.y)-(a.config.length+b.config.length)/2<=.25){const lead=(ra.y-rb.y)*Math.sin(ra.a)>0?a:b,follow=lead===a?b:a;
-    const lt=canUseTrench(lead.config),ft=canUseTrench(follow.config),second=lt&&!ft?`${lead.config.team} takes the trench and ${follow.config.team} the bump`:ft?`${lead.config.team} takes the bump and ${follow.config.team} the trench`:`both take bumps (neither fits the trench)`;
-    return ` Tandem: ${lead.config.team} leads and ${follow.config.team} follows through one lane on pass 1, then on pass 2 ${second}.`;}}
+  for(const a of mine)for(const b of mine){if(a===b||a.config.team>b.config.team)continue;const lead=globalThis.FieldPhysics.tandemLead(a,b);if(!lead)continue;const follow=lead===a?b:a;
+   const lt=canUseTrench(lead.config),ft=canUseTrench(follow.config),second=lt&&!ft?`${lead.config.team} takes the trench and ${follow.config.team} the bump`:ft?`${lead.config.team} takes the bump and ${follow.config.team} the trench`:`both take bumps (neither fits the trench)`;
+   return ` Tandem: ${lead.config.team} leads and ${follow.config.team} follows through one lane on pass 1, then on pass 2 ${second}.`;}
   return '';};
  const entries=[];
  for(const entry of preview.fleet){
@@ -216,33 +215,44 @@ function renderStartLayout(){
   const text=node('text',{'font-size':Math.min(.3,c.width*.36,c.length*.3),fill:'#fff','font-weight':'bold','text-anchor':'middle','dominant-baseline':'middle','pointer-events':'none'},g);text.textContent=c.team;
   const title=node('title',{},g);title.textContent=`${c.team}${canEdit?'':' (locked)'}`;
   const paint=()=>{const deg=r.a*180/Math.PI;g.setAttribute('transform',`translate(${r.x} ${r.y}) rotate(${deg})`);text.setAttribute('transform',`rotate(${-deg})`);if(entry===ownEntry)placeStation(r.y);};
-  const peers=preview.fleet.filter(o=>o!==entry&&o.config.alliance===c.alliance);
-  const free=(y,a)=>{const e=startPlacement(c,a,blue),p={x:e.x,y,a,length:c.length,width:c.width};return peers.every(o=>!obbOverlap(p,{x:o.robot.x,y:o.robot.y,a:o.robot.a,length:o.config.length,width:o.config.width}));};
-  // Clamp to the walls, snap bumper to bumper (or bumper to wall) when close, otherwise slide to the nearest open slot.
-  const settle=(want,a)=>{const e=startPlacement(c,a,blue),lo=e.ey,hi=H-e.ey;want=Math.max(lo,Math.min(hi,want));
-   const options=[lo,hi,...peers.flatMap(o=>{const oe=startPlacement(o.config,o.robot.a,blue);return [o.robot.y-oe.ey-e.ey,o.robot.y+oe.ey+e.ey];})].filter(y=>y>=lo-1e-9&&y<=hi+1e-9&&free(y,a));
-   const nearest=options.reduce((best,y)=>best===undefined||Math.abs(y-want)<Math.abs(best-want)?y:best,undefined);
-   if(nearest!==undefined&&Math.abs(nearest-want)<.18)return nearest;
-   if(free(want,a))return want;
-   return nearest===undefined?null:nearest;};
-  const apply=(y,a)=>{const e=startPlacement(c,a,blue);r.y=y;r.a=a;r.x=e.x;r.startY=y;r.startA=a;paint();};
-  const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts at ${r.y.toFixed(2)} m, ${headingName(c,r.a)}, touching the start line. The driver station view lines up with it.${tandemNote()}`;
-   if(room)online.send({type:'start_position',team:c.team,y:r.y,a:r.a});else{soloStartPositions[c.team]={y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
+  const peers=preview.fleet.filter(o=>o!==entry&&o.config.alliance===c.alliance),E=1e-3,SL=globalThis.FieldPhysics.FIELD.startLine;
+  const peerBox=o=>{const e=startPlacement(o.config,o.robot.a,blue);return {x:o.robot.x,y:o.robot.y,ex:e.ex,ey:e.ey,a:o.robot.a,length:o.config.length,width:o.config.width};};
+  const bounds=a=>{const e=startPlacement(c,a,blue);return {e,lo:blue?e.ex:W-SL+e.ex,hi:blue?SL-e.ex:W-e.ex};};
+  const touchesLine=(x,a)=>{const {lo,hi}=bounds(a);return Math.abs(x-(blue?hi:lo))<E;};
+  const touchesPeer=(x,y,a)=>{const {e}=bounds(a);return peers.some(o=>{const q=peerBox(o),dx=Math.abs(x-q.x)-(e.ex+q.ex),dy=Math.abs(y-q.y)-(e.ey+q.ey);return (Math.abs(dx)<E&&dy<-E)||(Math.abs(dy)<E&&dx<-E);});};
+  // Legal: inside the zone, no overlap, and touching the start line or flush against a teammate.
+  const legal=(x,y,a)=>{const {e,lo,hi}=bounds(a);if(x<lo-E||x>hi+E||y<e.ey-E||y>H-e.ey+E)return false;
+   const p={x,y,a,length:c.length,width:c.width};if(peers.some(o=>obbOverlap(p,peerBox(o))))return false;return touchesLine(x,a)||touchesPeer(x,y,a);};
+  // Snap to the line, teammates' bumpers, walls and teammates' centerlines, then take the nearest legal pose.
+  const settle=(wantX,wantY,a,snap=true)=>{const {e,lo,hi}=bounds(a),ylo=e.ey,yhi=H-e.ey,line=blue?hi:lo;
+   const xs=[line],ys=[ylo,yhi];for(const o of peers){const q=peerBox(o);xs.push(q.x-q.ex-e.ex,q.x+q.ex+e.ex);ys.push(q.y-q.ey-e.ey,q.y+q.ey+e.ey);}
+   const centers=peers.map(o=>[o.robot.x,o.robot.y]);
+   let x=Math.max(lo,Math.min(hi,wantX)),y=Math.max(ylo,Math.min(yhi,wantY));
+   if(snap){for(const t of ys)if(Math.abs(t-y)<.15)y=t;for(const [,cy] of centers)if(Math.abs(cy-y)<.1)y=cy;}
+   const xc=[x,...xs.filter(t=>t>=lo-E&&t<=hi+E)],yc=[y,...ys.filter(t=>t>=ylo-E&&t<=yhi+E)];
+   let best=null,bd=Infinity;for(const cx of xc)for(const cy of yc){if(!legal(cx,cy,a))continue;const d=Math.hypot(cx-x,cy-y);if(d<bd){bd=d;best={x:cx,y:cy};}}
+   return best;};
+  const apply=(x,y,a)=>{r.x=x;r.y=y;r.a=a;r.startX=x;r.startY=y;r.startA=a;paint();};
+  const where=()=>touchesLine(r.x,r.a)?'touching the start line':'bumper to bumper with a teammate';
+  const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts ${headingName(c,r.a)}, ${where()}. The driver station view lines up with it.${tandemNote()}`;
+   if(room)online.send({type:'start_position',team:c.team,x:r.x,y:r.y,a:r.a});else{soloStartPositions[c.team]={x:r.x,y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
   paint();entries.push({g,entry});
   if(!canEdit)continue;
+  const norm=a=>Math.atan2(Math.sin(a),Math.cos(a));
   const select=()=>{startSelected=c.team;for(const o of entries)o.g.classList.toggle('selected',o.entry===entry);$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;
-   startActions={rotate:dir=>{const a=Math.atan2(Math.sin(r.a+dir*Math.PI/2),Math.cos(r.a+dir*Math.PI/2)),y=settle(r.y,a);if(y===null){$('startLayoutMessage').textContent='No room to rotate there. Move a teammate first.';return;}apply(y,a);commit();},
-    flip:()=>{const a=Math.atan2(Math.sin(r.a+Math.PI),Math.cos(r.a+Math.PI)),y=settle(r.y,a);if(y===null)return;apply(y,a);commit();}};};
+   const turn=a=>{const next=settle(r.x,r.y,a,false);if(!next){$('startLayoutMessage').textContent='No room to rotate there. Move a teammate first.';return;}apply(next.x,next.y,a);commit();};
+   startActions={rotate:dir=>turn(norm(r.a+dir*Math.PI/2)),flip:()=>turn(norm(r.a+Math.PI))};};
   if(startSelected===c.team)select();
-  let dragging=false;const pointerY=e=>{const rect=svg.getBoundingClientRect();return (e.clientY-rect.top)/rect.height*H;};
-  const move=y=>{const next=settle(y,r.a);if(next===null){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}apply(next,r.a);return true;};
+  let dragging=false;const pointer=e=>{const rect=svg.getBoundingClientRect();return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.height*H];};
+  const move=(x,y,snap=true)=>{const next=settle(x,y,r.a,snap);if(!next){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}apply(next.x,next.y,r.a);return true;};
   g.addEventListener('pointerdown',e=>{e.preventDefault();select();dragging=true;g.setPointerCapture(e.pointerId);g.classList.add('dragging');g.focus();});
-  g.addEventListener('pointermove',e=>{if(dragging)move(pointerY(e));});
-  const finish=e=>{if(!dragging)return;dragging=false;g.classList.remove('dragging');if(e.type==='pointerup')move(pointerY(e));commit();};
+  g.addEventListener('pointermove',e=>{if(dragging)move(...pointer(e));});
+  const finish=e=>{if(!dragging)return;dragging=false;g.classList.remove('dragging');if(e.type==='pointerup')move(...pointer(e));commit();};
   g.addEventListener('pointerup',finish);g.addEventListener('pointercancel',finish);
   g.addEventListener('focus',select);
   g.addEventListener('keydown',e=>{
-   if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();e.stopPropagation();if(move(r.y+(e.key==='ArrowUp'?-1:1)*(e.shiftKey?.02:.1)))commit();}
+   const step=e.shiftKey?.02:.1,d={ArrowUp:[0,-step],ArrowDown:[0,step],ArrowLeft:[-step,0],ArrowRight:[step,0]}[e.key];
+   if(d){e.preventDefault();e.stopPropagation();if(move(r.x+d[0],r.y+d[1],false))commit();}
    else if(e.code==='KeyR'){e.preventDefault();e.stopPropagation();startActions?.rotate(e.shiftKey?-1:1);}
   });
  }
