@@ -34,6 +34,7 @@ console.log('Bump-only scorers collect and wait through inactive shifts');
   const b={config:cfg,robot:{x:2,y:2.51,a:0},inventory:15};
   const s={fleet:[{robot:{x:15,y:7,vx:0,vy:0}},b],phase:{id:'shift1',shift:true},phaseRemaining:15,activeAt:()=>false,time:40,balls:[]};
   const leave=defenderInput(s); assert(leave.moveX>0 && !leave.shoot,'inactive passer leaves home with fuel');
+  b.robot.x=4.2; s.time+=.1; const crossing=defenderInput(s); assert(crossing.moveX>0 && !crossing.shoot,'passer keeps driving without shooting until clear of divider');
   b.robot.x=6; s.time++; const pass=defenderInput(s); assert(pass.shoot,'inactive passer fires outside home');
   s.phase={id:'endgame'}; s.activeAt=()=>true; s.time++; assert(defenderInput(s).shoot,'endgame passer fires outside home');
   b.robot.x=2; s.time++; assert(defenderInput(s).shoot,'endgame passer scores at home');
