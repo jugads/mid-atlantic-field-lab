@@ -1,11 +1,12 @@
-import {defenderInput} from './defender.js?v=density29';
+import {defenderInput} from './defender.js?v=practice30';
 
 export function createHostSimulation(room){
   const {Simulation}=globalThis.FieldPhysics,{resolve}=globalThis.TeamPresets;
   const roster=room.players.map(p=>resolve(p.team,p.alliance));
-  const size=room.mode==='3v3'||room.mode==='3v3solo'||room.mode==='3v3coop'?3:room.mode==='2v2'?2:0;
+  const size=room.mode==='3v3'||room.mode==='3v3solo'||room.mode==='3v3coop'||room.mode==='3v0'?3:room.mode==='2v2'?2:0;
   const used=new Set(roster.map(c=>c.team)),pool=Object.keys(globalThis.TeamPresets.profiles);
   if(size)for(const alliance of ['blue','red']){
+    if(room.mode==='3v0'&&!roster.some(r=>r.alliance===alliance))continue;
     const count=roster.filter(r=>r.alliance===alliance).length;
     for(let i=count;i<size;i++){
       const owner=room.players.find(p=>p.alliance===alliance),slot=i-count;
@@ -27,7 +28,7 @@ export function matchInputs(sim,humanInputs,difficulty='medium'){
     const enemies=sim.fleet.map((e,j)=>({e,j})).filter(({e})=>e.config.alliance!==sim.fleet[i].config.alliance);
     const human=enemies.find(({j})=>j<count),ordinal=sim.fleet.slice(count,i).filter(e=>e.config.alliance===sim.fleet[i].config.alliance).length;
     const target=(ordinal===0&&human?human:enemies[ordinal%enemies.length]);
-    inputs.push(target?defenderInput(sim,difficulty,i,target.j):{});
+    inputs.push(defenderInput(sim,difficulty,i,target?.j ?? -1));
   }
   return inputs;
 }

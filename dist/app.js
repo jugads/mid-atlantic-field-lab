@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=density29';
-import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=density29';
+import {defenderInput,defenderTeam} from './defender.js?v=practice30';
+import {MultiplayerClient,createHostSimulation,matchInputs} from './multiplayer.js?v=practice30';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -12,7 +12,7 @@ let selectedTeam='341',keys=new Set(),last=0,accumulator=0,suppressGamepadShoot=
 
 function selectRobot(team){
   if(sim.started||countdown.active||!profiles[team]||online.active&&online.room.status!=='lobby')return;
-  if(!online.active&&$('soloMatch').value==='3v3solo'&&Object.values(soloAi).flat().includes(team))return;
+  if(!online.active&&['3v3solo','3v0'].includes($('soloMatch').value)&&($('soloMatch').value==='3v0'?soloAi.blue:Object.values(soloAi).flat()).includes(team))return;
   if(online.active&&['3v3','3v3coop'].includes(online.room.mode)&&online.room.players.some(p=>p.id!==online.id&&p.team===team||p.aiTeams.includes(team)))return;
   selectedTeam=team;if(!online.active){sim.multiplayer=false;sim.activeIndex=0;sim.roster=[resolvePreset(team)];}sim.setConfig(resolvePreset(team));sim.reset();keys.clear();accumulator=0;
   const moveFocus=document.activeElement?.classList.contains('robot-choice');
@@ -35,7 +35,7 @@ function refreshIdentity(){const c=sim.config;$('robotNumber').textContent=c.tea
  $('fuelSetup').textContent=`${sim.initialCenterCount} center · 48 depots · 48 outposts · ${Math.min(8,c.capacity)} preload`;}
 function togglePause(){if(online.active){online.send({type:'pause'});keys.clear();return;}if(countdown.active)countdown.togglePause();else sim.pause();keys.clear();updateMatch();}
 function reset(){if(online.active){online.send({type:'rematch'});return;}countdown.cancel();sim.reset();keys.clear();accumulator=0;selectRobot(selectedTeam);}
-$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if($('soloMatch').value==='3v3solo'){const match=createHostSimulation({mode:'3v3solo',players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster);}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
+$('start').onclick=()=>{if(onlineMode){if(online.active)online.send({type:'ready',ready:!online.self?.ready});keys.clear();canvas.focus();return;}if(sim.started||countdown.active)return;if(['3v3solo','3v0'].includes($('soloMatch').value)){const match=createHostSimulation({mode:$('soloMatch').value,players:[{team:selectedTeam,alliance:'blue'}],aiTeams:soloAi,aiRoles:soloRoles});sim.enableMultiplayer(match.roster);}else if($('aiDefender').checked)sim.enableMultiplayer([resolvePreset(selectedTeam),{...resolvePreset(defenderTeam($('defenderDifficulty').value)===selectedTeam?'2539':defenderTeam($('defenderDifficulty').value),'red'),intakeDirection:'front'}]);countdown.start();keys.clear();accumulator=0;updateMatch();canvas.focus();};
 $('pause').onclick=togglePause;$('reset').onclick=reset;
 $('resultsButton').onclick=()=>{renderResults();$('resultsDialog').showModal();};$('closeResults').onclick=()=>$('resultsDialog').close();
 $('help').onclick=()=>{if(!online.active&&(sim.running||countdown.running))togglePause();$('helpDialog').showModal();};$('closeHelp').onclick=()=>$('helpDialog').close();
@@ -148,16 +148,16 @@ function frame(now){
    sim.intake=sim.controlsEnabled&&!!input.intake;
    let matchDt=dt;
    if(countdown.active){matchDt=0;if(!document.hidden&&countdown.advance(elapsed)){sim.start();keys.clear();accumulator=0;updateMatch();}}
-   if(sim.running&&!document.hidden){accumulator+=matchDt;while(accumulator>=1/120){sim.step(1/120,sim.multiplayer?(sim.fleet.length===6?matchInputs(sim,[input],$('defenderDifficulty').value):[input,defenderInput(sim,$('defenderDifficulty').value)]):input);accumulator-=1/120;}}else accumulator=0;
+   if(sim.running&&!document.hidden){accumulator+=matchDt;while(accumulator>=1/120){sim.step(1/120,sim.multiplayer?(sim.fleet.length>2?matchInputs(sim,[input],$('defenderDifficulty').value):[input,defenderInput(sim,$('defenderDifficulty').value)]):input);accumulator-=1/120;}}else accumulator=0;
  }
  draw();requestAnimationFrame(frame);
 }
 function renderAiSelections(){
- const box=$('aiSelections'),inRoom=onlineMode&&['3v3','3v3coop'].includes(online.room?.mode)&&online.room.status==='lobby',solo=!onlineMode&&$('soloMatch').value==='3v3solo';
+ const box=$('aiSelections'),inRoom=onlineMode&&['3v3','3v3coop'].includes(online.room?.mode)&&online.room.status==='lobby',solo=!onlineMode&&['3v3solo','3v0'].includes($('soloMatch').value);
  box.hidden=!(inRoom||solo);if(box.hidden){box.replaceChildren();for(const button of $('robotChoices').children)button.disabled=false;return;}
  const heading=document.createElement('strong');heading.textContent=inRoom?'Your AI teammates':'Choose AI robots';box.replaceChildren(heading);
- const groups=solo?['blue','red']:(online.self?.aiTeams?.length?[online.self.alliance]:[]);
- const occupied=solo?[selectedTeam,...Object.values(soloAi).flat()]:(online.room?.players.flatMap(p=>[p.team,...p.aiTeams])||[]);
+ const groups=solo?($('soloMatch').value==='3v0'?['blue']:['blue','red']):(online.self?.aiTeams?.length?[online.self.alliance]:[]);
+ const occupied=solo?[selectedTeam,...groups.flatMap(a=>soloAi[a])]:(online.room?.players.flatMap(p=>[p.team,...p.aiTeams])||[]);
  for(const button of $('robotChoices').children)button.disabled=button.dataset.team!==selectedTeam&&occupied.includes(button.dataset.team);
  for(const alliance of groups){const selections=solo?soloAi[alliance]:(online.self?.aiTeams||['2539','2539']);selections.forEach((team,slot)=>{
   const label=document.createElement('label');label.textContent=`${alliance.toUpperCase()} AI ${slot+1} `;const select=document.createElement('select');select.setAttribute('aria-label',`${alliance} AI ${slot+1}`);
@@ -197,7 +197,7 @@ function networkChanged(msg){
 function setOnlineMode(value){
  if(online.active)return;
  if(!value&&online.state==='connecting')online.leave(false);
- onlineMode=value;$('soloMatchOption').hidden=value;$('defenderOption').hidden=value||$('soloMatch').value==='3v3solo';$('defenderDifficultyOption').hidden=value||(!$('aiDefender').checked&&$('soloMatch').value!=='3v3solo');$('picker').classList.toggle('room-mode',value);$('onlinePanel').hidden=!value;$('soloTab').setAttribute('aria-pressed',String(!value));$('onlineTab').setAttribute('aria-pressed',String(value));
+ onlineMode=value;$('soloMatchOption').hidden=value;$('defenderOption').hidden=value||['3v3solo','3v0'].includes($('soloMatch').value);$('defenderDifficultyOption').hidden=value||(!$('aiDefender').checked&&!['3v3solo','3v0'].includes($('soloMatch').value));$('picker').classList.toggle('room-mode',value);$('onlinePanel').hidden=!value;$('soloTab').setAttribute('aria-pressed',String(!value));$('onlineTab').setAttribute('aria-pressed',String(value));
  renderAiSelections();updateMatch();
 }
 function connectRoom(type){
@@ -207,8 +207,8 @@ function connectRoom(type){
  try{localStorage.setItem('fieldLabServer',endpoint);}catch{}
  online.connect(endpoint,{type,mode:$('roomMode').value,code:$('roomCodeInput').value.trim().toUpperCase(),team:selectedTeam});
 }
-$('aiDefender').onchange=()=>$('defenderDifficultyOption').hidden=onlineMode||(!$('aiDefender').checked&&$('soloMatch').value!=='3v3solo');
-$('soloMatch').onchange=()=>{const full=$('soloMatch').value==='3v3solo';if(full){const used=new Set([selectedTeam]);for(const alliance of ['blue','red'])soloAi[alliance]=soloAi[alliance].map(id=>{const chosen=used.has(id)?teams.find(t=>!used.has(t)):id;used.add(chosen);return chosen;});}$('defenderOption').hidden=full;$('defenderDifficultyOption').hidden=!full&&!$('aiDefender').checked;renderAiSelections();};
+$('aiDefender').onchange=()=>$('defenderDifficultyOption').hidden=onlineMode||(!$('aiDefender').checked&&!['3v3solo','3v0'].includes($('soloMatch').value));
+$('soloMatch').onchange=()=>{const full=['3v3solo','3v0'].includes($('soloMatch').value);if(full){const used=new Set([selectedTeam]);for(const alliance of ($('soloMatch').value==='3v0'?['blue']:['blue','red']))soloAi[alliance]=soloAi[alliance].map(id=>{const chosen=used.has(id)?teams.find(t=>!used.has(t)):id;used.add(chosen);return chosen;});}$('defenderOption').hidden=full;$('defenderDifficultyOption').hidden=!full&&!$('aiDefender').checked;renderAiSelections();};
 $('soloTab').onclick=()=>setOnlineMode(false);$('onlineTab').onclick=()=>setOnlineMode(true);
 $('createRoom').onclick=()=>connectRoom('create');$('joinRoom').onclick=()=>connectRoom('join');
 $('leaveRoom').onclick=()=>{online.leave();keys.clear();networkChanged();};

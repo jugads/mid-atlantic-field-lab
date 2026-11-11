@@ -3,7 +3,7 @@ export const defenderTeam = () => '316';
 const scoringState = new WeakMap();
 const defenseState = new WeakMap();
 function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0, role = 'auto') {
-  const defender = sim.fleet[botIndex], player = sim.fleet[opponentIndex].robot, r = defender.robot;
+  const defender = sim.fleet[botIndex], opponent = sim.fleet[opponentIndex], noOpponent = !opponent, player = opponent?.robot || {x:-100,y:-100,vx:0,vy:0,a:0}, r = defender.robot;
   const hard = difficulty === 'hard', easy = difficulty === 'easy';
   // Route according to this robot's clearance, not the robot it is defending.
   const canCrossTrench = globalThis.FieldPhysics?.canUseTrench?.(defender.config) ?? ((defender.config.height ?? 0) <= .5652 && (defender.config.width ?? 0) <= 1.30);
@@ -20,10 +20,10 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
   };
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const passClear = red ? r.x < 16.54 - 4.03 - 1.194 - defender.config.length / 2 - .08 : r.x > 4.03 + 1.194 + defender.config.length / 2 + .08;
-  const waitingToScore = role === 'score' && !canCrossTrench && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
+  const waitingToScore = ((noOpponent && !['pass','collect'].includes(role)) || (role === 'score' && !canCrossTrench)) && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const passing = role === 'pass' && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
-  const scoring = waitingToScore || sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
+  const scoring = noOpponent || waitingToScore || sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
   // A small defensive traction advantage affects contact, not top speed.
   r.defensePush = !scoring && hard ? 1.06 : 1;
   if (scoring) {
@@ -205,7 +205,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
   const pin = sim.pinCounts?.find(p => p.attacker === botIndex && p.victim === opponentIndex);
   if (pin && pin.elapsed >= 2.1) ds.backoffUntil = Math.max(ds.backoffUntil, sim.time + 1);
   if (sim.time < ds.backoffUntil) return { moveX: dx / distance, moveY: dy / distance };
-  const enemy = sim.fleet[opponentIndex].config;
+  const enemy = opponent?.config;
   const enemyBlue = enemy?.alliance ? enemy.alliance === 'blue' : player.x < 8.27;
   const hubX = enemyBlue ? 4.03 + 1.194 / 2 : 16.54 - 4.03 - 1.194 / 2;
   const inTrench = Math.abs(r.x - hubX) < 1.3 && (r.y < 1.4 || r.y > 8.07 - 1.4);
@@ -387,7 +387,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
       input.moveX=0;
     }
   }
-  const waitingToScore = role === 'score' && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance) && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30));
+  const waitingToScore = ((opponentIndex < 0 && !['pass','collect'].includes(role)) || (role === 'score' && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30)))) && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance);
   if (waitingToScore || (!active && home && ['collect','pass'].includes(role))) input.shoot = false;
   else if (role === 'pass' && !passClear && !sim.activeAt(c.alliance)) input.shoot = false;
   else if (role === 'pass' && bot.inventory > 0 && passClear && sim.phase.id === 'endgame') input.shoot = true;
