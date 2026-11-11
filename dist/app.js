@@ -1,5 +1,5 @@
-import {defenderInput,defenderTeam} from './defender.js?v=tandem36';
-import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem36';
+import {defenderInput,defenderTeam} from './defender.js?v=tandem37';
+import {MultiplayerClient,createHostSimulation,matchInputs,startFields} from './multiplayer.js?v=tandem37';
 import {FieldView} from './view3d.js?v=camera25';
 const {Simulation,ARCHETYPES,clamp,canUseTrench}=globalThis.FieldPhysics;
 const {names,profiles,resolve:resolvePreset}=globalThis.TeamPresets;
@@ -221,19 +221,20 @@ function renderStartLayout(){
   const touchesLine=(x,a)=>{const {lo,hi}=bounds(a);return Math.abs(x-(blue?hi:lo))<E;};
   const touchesPeer=(x,y,a)=>{const {e}=bounds(a);return peers.some(o=>{const q=peerBox(o),dx=Math.abs(x-q.x)-(e.ex+q.ex),dy=Math.abs(y-q.y)-(e.ey+q.ey);return (Math.abs(dx)<E&&dy<-E)||(Math.abs(dy)<E&&dx<-E);});};
   // Legal: inside the zone, no overlap, and touching the start line.
-  const legal=(x,y,a)=>{const {e,lo,hi}=bounds(a);if(x<lo-E||x>hi+E||y<e.ey-E||y>H-e.ey+E)return false;
-   const p={x,y,a,length:c.length,width:c.width};if(peers.some(o=>obbOverlap(p,peerBox(o))))return false;return touchesLine(x,a);};
+  const underTrench=(x,y,a)=>{const t=globalThis.FieldPhysics.trenchStart(c,a,y,blue);return !!t&&Math.abs(x-t.x)<E;};
+  const legal=(x,y,a)=>{const {e,lo,hi}=bounds(a),under=underTrench(x,y,a);if(y<e.ey-E||y>H-e.ey+E||(!under&&(x<lo-E||x>hi+E)))return false;
+   const p={x,y,a,length:c.length,width:c.width};if(peers.some(o=>obbOverlap(p,peerBox(o))))return false;return under||touchesLine(x,a);};
   // Snap to the line, teammates' bumpers, walls and teammates' centerlines, then take the nearest legal pose.
   const settle=(wantX,wantY,a,snap=true)=>{const {e,lo,hi}=bounds(a),ylo=e.ey,yhi=H-e.ey,line=blue?hi:lo;
-   const xs=[line],ys=[ylo,yhi];for(const o of peers){const q=peerBox(o);xs.push(q.x-q.ex-e.ex,q.x+q.ex+e.ex);ys.push(q.y-q.ey-e.ey,q.y+q.ey+e.ey);}
+   const TW=globalThis.FieldPhysics.FIELD.trenchWidth,xs=[line,blue?SL+e.ex:W-SL-e.ex],ys=[ylo,yhi,TW-e.ey,H-TW+e.ey];for(const o of peers){const q=peerBox(o);xs.push(q.x-q.ex-e.ex,q.x+q.ex+e.ex);ys.push(q.y-q.ey-e.ey,q.y+q.ey+e.ey);}
    const centers=peers.map(o=>[o.robot.x,o.robot.y]);
-   let x=Math.max(lo,Math.min(hi,wantX)),y=Math.max(ylo,Math.min(yhi,wantY));
+   let x=Math.max(e.ex,Math.min(W-e.ex,wantX)),y=Math.max(ylo,Math.min(yhi,wantY));
    if(snap){for(const t of ys)if(Math.abs(t-y)<.15)y=t;for(const [,cy] of centers)if(Math.abs(cy-y)<.1)y=cy;}
-   const xc=[x,...xs.filter(t=>t>=lo-E&&t<=hi+E)],yc=[y,...ys.filter(t=>t>=ylo-E&&t<=yhi+E)];
+   const xc=[x,...xs.filter(t=>t>=e.ex-E&&t<=W-e.ex+E)],yc=[y,...ys.filter(t=>t>=ylo-E&&t<=yhi+E)];
    let best=null,bd=Infinity;for(const cx of xc)for(const cy of yc){if(!legal(cx,cy,a))continue;const d=Math.hypot(cx-x,cy-y);if(d<bd){bd=d;best={x:cx,y:cy};}}
    return best;};
   const apply=(x,y,a)=>{r.x=x;r.y=y;r.a=a;r.startX=x;r.startY=y;r.startA=a;paint();};
-  const where=()=>'touching the start line';
+  const where=()=>underTrench(r.x,r.y,r.a)?'under the trench, back bumper on the start line':'touching the start line';
   const commit=()=>{$('startSelected').textContent=`Team ${c.team} · ${headingName(c,r.a)}`;$('startLayoutMessage').textContent=`Team ${c.team} starts ${headingName(c,r.a)}, ${where()}. The driver station view lines up with it.${tandemNote()}`;
    if(room)online.send({type:'start_position',team:c.team,x:r.x,y:r.y,a:r.a});else{soloStartPositions[c.team]={x:r.x,y:r.y,a:r.a};if(c.team===selectedTeam&&!sim.multiplayer&&!sim.started&&!countdown.active){Object.assign(sim.roster[0],startFields(soloStartPositions[c.team]));sim.reset();}}};
   const api={cfg:c,r,apply,commit};entries.push({g,entry,api,canEdit});
@@ -250,7 +251,20 @@ function renderStartLayout(){
      const others=peers.filter(p=>p!==mates[0].entry);
      const fits=others.every(p=>!obbOverlap({x:eS.x,y:mine[0],a,length:c.length,width:c.width},peerBox(p))&&!obbOverlap({x:eO.x,y:mine[1],a,length:o.cfg.length,width:o.cfg.width},peerBox(p)));
      if(!fits){$('startLayoutMessage').textContent='No room to stack there. Move a teammate first.';return;}
-     o.apply(eO.x,mine[1],a);apply(eS.x,mine[0],a);o.commit();commit();}};};
+     o.apply(eO.x,mine[1],a);apply(eS.x,mine[0],a);o.commit();commit();},
+    // One robot under the trench (back bumper on the line), a teammate in the zone with its front bumper on the line.
+    trench:()=>{const mates=entries.filter(o=>o.entry!==entry&&o.canEdit).sort((p,q)=>Math.abs(p.api.r.y-r.y)-Math.abs(q.api.r.y-r.y));
+     if(!mates.length){$('startLayoutMessage').textContent='This needs a second robot you control.';return;}
+     const m=mates[0],toward=blue?0:Math.PI,fits=x=>canUseTrench(x.cfg),first=fits({cfg:c})?{api:{cfg:c,apply,commit,r}}:fits(m.api)?m:null;
+     if(!first){$('startLayoutMessage').textContent='Neither robot fits under the trench.';return;}
+     const under=first.api,zone=first.api===m.api?{cfg:c,apply,commit,r}:m.api,TW=globalThis.FieldPhysics.FIELD.trenchWidth;
+     const lanes=[TW/2,H-TW/2],laneY=lanes.reduce((b,v)=>Math.abs(v-under.r.y)<Math.abs(b-under.r.y)?v:b);
+     const eU=globalThis.FieldPhysics.trenchStart(under.cfg,toward,laneY,blue),eZ=startPlacement(zone.cfg,toward,blue);
+     if(!eU){$('startLayoutMessage').textContent='That robot does not fit the trench.';return;}
+     const pair=[mates[0].entry,entry],others=peers.filter(p=>p!==mates[0].entry);
+     const fitsClear=others.every(p=>!obbOverlap({x:eU.x,y:laneY,a:toward,length:under.cfg.length,width:under.cfg.width},peerBox(p))&&!obbOverlap({x:eZ.x,y:laneY,a:toward,length:zone.cfg.length,width:zone.cfg.width},peerBox(p)));
+     if(!fitsClear){$('startLayoutMessage').textContent='No room in that trench lane. Move a teammate first.';return;}
+     under.apply(eU.x,laneY,toward);zone.apply(eZ.x,laneY,toward);zone.commit();under.commit();}};};
   if(startSelected===c.team)select();
   let dragging=false;const pointer=e=>{const rect=svg.getBoundingClientRect();return [(e.clientX-rect.left)/rect.width*W,(e.clientY-rect.top)/rect.height*H];};
   const move=(x,y,snap=true)=>{const next=settle(x,y,r.a,snap);if(!next){$('startLayoutMessage').textContent='Robots cannot overlap. Choose another position.';return false;}apply(next.x,next.y,r.a);return true;};
@@ -267,7 +281,7 @@ function renderStartLayout(){
  }
  if(!entries.some(o=>o.entry.config.team===startSelected&&editable.has(o.entry.config.team))){startSelected=null;startActions=null;$('startSelected').textContent='Select a robot';}
 }
-$('startRotL').onclick=()=>startActions?.rotate(-1);$('startRotR').onclick=()=>startActions?.rotate(1);$('startFlip').onclick=()=>startActions?.flip();$('startStack').onclick=()=>startActions?.stack();
+$('startRotL').onclick=()=>startActions?.rotate(-1);$('startRotR').onclick=()=>startActions?.rotate(1);$('startFlip').onclick=()=>startActions?.flip();$('startStack').onclick=()=>startActions?.stack();$('startTrench').onclick=()=>startActions?.trench();
 function renderAiSelections(){
  const box=$('aiSelections'),inRoom=onlineMode&&['3v3','3v3coop'].includes(online.room?.mode)&&online.room.status==='lobby',solo=!onlineMode&&['3v3solo','3v0'].includes($('soloMatch').value);
  box.hidden=!(inRoom||solo);if(box.hidden){box.replaceChildren();for(const button of $('robotChoices').children)button.disabled=false;renderStartLayout();return;}

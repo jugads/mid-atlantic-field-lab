@@ -85,6 +85,12 @@
     const ex=Math.abs(Math.cos(a))*c.length/2+Math.abs(Math.sin(a))*c.width/2,ey=Math.abs(Math.sin(a))*c.length/2+Math.abs(Math.cos(a))*c.width/2;
     return {ex,ey,x:blue?FIELD.startLine-ex:W-FIELD.startLine+ex};
   }
+  // A robot that fits the trench may start underneath it, back edge on the start line.
+  function trenchStart(c,a,y,blue){
+    if(!canUseTrench(c))return null;const e=startPlacement(c,a,blue),t=FIELD.trenchWidth,k=1e-3;
+    const inLane=(y-e.ey>=-k&&y+e.ey<=t+k)||(y-e.ey>=H-t-k&&y+e.ey<=H+k);
+    return inLane?{x:blue?FIELD.startLine+e.ex:W-FIELD.startLine-e.ex,y}:null;
+  }
   // Oriented-rectangle overlap for parked robots; touching bumpers do not count as overlap.
   function obbOverlap(p,q){
     const axes=[p.a,p.a+Math.PI/2,q.a,q.a+Math.PI/2].map(t=>[Math.cos(t),Math.sin(t)]);
@@ -109,11 +115,11 @@
       const occupied={blue:[],red:[]};this.fleet=this.roster.map(config=>{
         const c={...config},blue=c.alliance==='blue',candidates=startingLocations(c),used=occupied[c.alliance];
         // A custom pose must touch the start line and may not overlap a teammate. Otherwise reserve a default lane.
-        const pose=(y,a,x)=>{const e=startPlacement(c,a,blue),lo=blue?e.ex:W-FIELD.startLine+e.ex,hi=blue?FIELD.startLine-e.ex:W-e.ex;return {x:Number.isFinite(x)?Math.max(lo,Math.min(hi,x)):e.x,y:Math.max(e.ey,Math.min(H-e.ey,y)),a,length:c.length,width:c.width};};
+        const pose=(y,a,x)=>{const e=startPlacement(c,a,blue),lo=blue?e.ex:W-FIELD.startLine+e.ex,hi=blue?FIELD.startLine-e.ex:W-e.ex;if(Number.isFinite(x)&&(blue?x>hi+.01:x<lo-.01)){const t=trenchStart(c,a,y,blue);return t?{x:t.x,y,a,length:c.length,width:c.width}:null;}return {x:Number.isFinite(x)?Math.max(lo,Math.min(hi,x)):e.x,y:Math.max(e.ey,Math.min(H-e.ey,y)),a,length:c.length,width:c.width};};
         const valid=p=>used.every(o=>!obbOverlap(p,o));
         const defaultA=blue?0:Math.PI;
         let chosen=null,area='custom';
-        if(Number.isFinite(c.startY)){const p=pose(c.startY,Number.isFinite(c.startA)?c.startA:defaultA,c.startX);if(valid(p))chosen=p;}
+        if(Number.isFinite(c.startY)){const p=pose(c.startY,Number.isFinite(c.startA)?c.startA:defaultA,c.startX);if(p&&valid(p))chosen=p;}
         if(!chosen){const found=candidates.map(q=>({q,p:pose(q.y,defaultA)})).find(o=>valid(o.p))||{q:candidates[0],p:pose(candidates[0].y,defaultA)};chosen=found.p;area=found.q.area;}
         used.push(chosen);
         const robot={x:chosen.x,y:chosen.y,startX:chosen.x,startY:chosen.y,startA:chosen.a,startArea:area,a:chosen.a,vx:0,vy:0,omega:0,impactOmega:0,z:0,pitch:0,roll:0};
@@ -651,6 +657,6 @@
       if(this.time>=166-1e-8){this.time=166;this.running=false;for(const entry of this.fleet){entry.robot.vx=0;entry.robot.vy=0;}}
     }
   }
-  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,startPlacement,obbOverlap,tandemLead,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
+  root.FieldPhysics={Simulation,base,ARCHETYPES,W,H,hubs,bumps,trenches,solids,towers,TOWER,FIELD,PHASES,BR,clamp,clearanceHeight,canUseTrench,startingLocations,startPlacement,trenchStart,obbOverlap,tandemLead,laneOffset,intakeSign,ball,phaseAt,terrainHeight,rectangleContact};
   if(typeof module!=='undefined')module.exports=root.FieldPhysics;
 })(globalThis);
