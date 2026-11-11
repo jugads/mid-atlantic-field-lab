@@ -1,3 +1,7 @@
+# Multiplayer update
+
+Private two-player 1v1 and co-op rooms are implemented. See [MULTIPLAYER.md](MULTIPLAYER.md) for local play, Render deployment, architecture, and current limits. The Netlify frontend needs the deployed Render server URL to enable public online play.
+
 # Mid-Atlantic Field Lab
 
 Full-screen, single-player 3D REBUILT field simulator. Three.js is bundled locally under its MIT license; there is no build step.
@@ -13,9 +17,9 @@ node tests/physics.cjs
 - WASD: camera-relative swerve movement; W/S forward/back and A/D turn for tank.
 - Left/Right arrows or Q/E: turn the chassis.
 - Space: shoot at your hub from your alliance zone; otherwise pass to the marked home-zone landing area.
-- I: toggle intake. P: pause. R: reset the match and choose a different robot.
+- Hold Left Shift to run the intake. P: pause. R: reset the match and choose a different robot.
 - Scroll: zoom. Free orbit camera allows dragging.
-- Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, X / Square toggles intake; on the pre-match screen the D-pad selects a robot and A / Cross starts; after a match A returns to the picker. Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
+- Standard gamepad: left stick drives, right stick turns; A / Cross or right trigger shoots, hold left trigger to run the intake; on the pre-match screen the D-pad selects a robot and A / Cross starts; after a match A returns to the picker. Start / Options starts or pauses. The page must be focused; press a controller button after connecting. The standard browser gamepad mapping is required.
 - Before starting, choose a built-in team on the selection screen. The match uses one robot; reset to choose another. Robots that fit the trench begin at its entrance; taller or wider robots start next to a bump. The protruding green intake marks the front.
 
 A three-second 3–2–1 countdown runs before AUTO starts, with pause and reset support. AUTO is deliberately driver-controlled, per the user's request. No autonomous routine runs automatically. The interface offers the built-in team profiles; selecting another robot requires resetting the match. Existing locally saved builds are left in browser storage but are not shown in the selection screen.
@@ -41,7 +45,7 @@ All robot presets default to 5 m/s top speed and 10 m/s² acceleration. Legacy s
 
 Bumps have sloping faces, approximately 15 degrees, 1.128 m travel depth, 1.854 m width and 0.1654 m crest height. Damped wheel contact samples raise/pitch/roll the chassis, with speed changing progressively over the bump. Trenches have 0.5652 m clearance and an intentionally widened 1.38 m practice lane (the official opening is narrower); tall robots cannot pass. Towers have a traversable base, separate upright, brace and rung collision volumes; rung heights are 0.6858, 1.143 and 1.6002 m. Robots and fuel collide with these structures at their actual modeled heights.
 
-This is a practice simulator, not a full rigid-body FRC digital twin. Tower depth placement and brace contact volumes are approximations; suspension, the idealized round hub rim and funnel, hub netting, ball deformation, and distribution are simplified. Climbing and climb scoring, fouls, ranking points, AI robots and human-player feeding are not implemented. Outpost reserves remain stored. Teams 341, 316, 1391 and 8513 have built-in presets based on the supplied specifications. Unspecified width, length, speed, acceleration and stationary accuracy use archetype defaults. Team 1391 scoring range is 3.7 m, approximately the hub-to-tower distance. Other profiles default to 6 m unless adjusted. Team 341 height (0.400 m) and moving accuracy (90%) interpret “very short” and “high”; team 8513 height is the 2026 legal maximum of 0.762 m, and its unspecified lane count defaults to three. Zero moving accuracy makes moving shots miss while allowing stationary shots. Accuracy settings tune spread rather than guarantee a score percentage.
+This is a practice simulator, not a full rigid-body FRC digital twin. Tower depth placement and brace contact volumes are approximations; suspension, the idealized round hub rim and funnel, hub netting, ball deformation, and distribution are simplified. Climbing and climb scoring, fouls, ranking points, AI robots and human-player feeding are not implemented. Outpost reserves remain stored. Teams 341, 316, 1391 and 8513 have built-in presets based on the supplied specifications. Unspecified width, length, speed, acceleration and stationary accuracy use archetype defaults. Team 1391 scoring range is 3.6 m, approximately the hub-to-tower distance. Other profiles default to 6 m unless adjusted. Team 341 height (0.400 m) and moving accuracy (90%) interpret “very short” and “high”; team 8513 height is the 2026 legal maximum of 0.762 m, and its unspecified lane count defaults to three. Zero moving accuracy makes moving shots miss while allowing stationary shots. Accuracy settings tune spread rather than guarantee a score percentage.
 
 ## Source
 

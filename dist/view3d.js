@@ -1,4 +1,5 @@
 import * as T from './vendor/three.module.js';
+import {driverStationPose} from './driver-camera.js';
 const {W,H,hubs,bumps,trenches,FIELD,TOWER,BR,laneOffset,intakeSign}=globalThis.FieldPhysics;
 export class FieldView {
   constructor(canvas){
@@ -61,7 +62,7 @@ export class FieldView {
     for(const tr of trenches){
       const x=tr.x-W/2,z=tr.y-H/2,color=tr.alliance==='blue'?'#4b7ccd':'#ce6157';
       const postZ=(tr.sign<0?FIELD.trenchWidth+.16:H-FIELD.trenchWidth-.16)-H/2;
-      this.box(FIELD.hubSize,1.022,.32,x,.511,postZ,color);
+      this.box(FIELD.hubSize,FIELD.dividerHeight,.32,x,FIELD.dividerHeight/2,postZ,color);
       // Open underpass, not a roofed box. Lowest beam surface is exactly 22.25 inches high.
       this.box(.16,.12,FIELD.trenchWidth,x,FIELD.trenchClearance+.06,z,color);
       this.box(.16,FIELD.trenchClearance,.065,x,FIELD.trenchClearance/2,tr.sign*(H/2-.0325),'#b4beb9');
@@ -99,12 +100,12 @@ export class FieldView {
       for(const y of TOWER.rungs){const rung=this.cylinder(TOWER.rungDiameter/2,TOWER.rungDiameter/2,TOWER.postGap+2*TOWER.postWidth,tx,y,0,color);rung.rotation.x=Math.PI/2;}
       const wallDirection=h.alliance==='blue'?-1:1;
       for(const side of [-1,1]){
-        const from=new T.Vector3(tx,.72,side*poleSpacing),to=new T.Vector3(tx+wallDirection*.85,1.1,side*poleSpacing);
+        const from=new T.Vector3(tx,.95,side*poleSpacing),to=new T.Vector3(tx+wallDirection*(TOWER.postX-.05),1.33,side*poleSpacing);
         const delta=to.clone().sub(from),brace=new T.Mesh(new T.BoxGeometry(.045,delta.length(),.045),this.material(color));
         brace.position.copy(from.clone().add(to).multiplyScalar(.5));brace.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),delta.normalize());brace.castShadow=true;this.scene.add(brace);
       }
       // Depot holds 24 floor fuel. Outpost stores another 24 before human-player feeding.
-      const depotZ=h.alliance==='blue'?H/2-.95:-H/2+.95,dx=h.alliance==='blue'?-W/2+.63:W/2-.63;
+      const depotZ=h.alliance==='blue'?-H/2+.95:H/2-.95,dx=h.alliance==='blue'?-W/2+.63:W/2-.63;
       this.box(.69,.015,1.07,dx,.012,depotZ,'#5d6152');
       for(const dz of [-.535,.535])this.box(.69,.029,.025,dx,.026,depotZ+dz,color);
       this.label('DEPOT · 24',dx+direction*.9,depotZ,'#aebca6',.3);
@@ -139,18 +140,25 @@ export class FieldView {
     // A single small bumper number and a simple shooter block keep the robot readable.
     const tag=new T.Mesh(new T.PlaneGeometry(l*.48,.10),new T.MeshBasicMaterial({map:tex}));
     tag.position.set(0,.16,w/2+.003);group.add(tag);
-    const shooter=new T.Group();group.add(shooter);
+    const shooter=new T.Group();group.add(shooter);const turrets=[];
     const back=c.shooterDirection==='back',direction=back?-1:1;
-    shooter.position.set(c.archetype==='dumper'?direction*l*.30:0,h+.025,0);
+    const mount=(c.shooterMount||c.shooterDirection)==='back'?-1:1;
+    shooter.position.set(c.archetype==='dumper'?mount*l*.30:0,h+.025,0);
     if(c.archetype==='dumper'){
       // One compact housing with a dark outlet, centered across the configured lanes.
       this.box(.22,.11,w*.36,0,.055,0,'#77717e',shooter);
       this.box(.012,.052,w*.28,direction*.116,.065,0,'#29252f',shooter);
+    }else if(c.archetype==='double_turret'){
+      for(const side of [-1,1]){
+        const turret=new T.Group();turret.position.set(-l*.34,0,side*w*.34);shooter.add(turret);turrets.push(turret);
+        this.cylinder(.10,.10,.065,0,.033,0,'#77717e',turret);
+        this.box(.17,.07,.09,.13,.07,0,'#aaa2b1',turret);
+      }
     }else{
-      const base=this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
+      this.cylinder(.12,.12,.065,0,.033,0,'#77717e',shooter);
       this.box(.20,.07,.10,.15,.07,0,'#aaa2b1',shooter);
     }
-    return {body,fill,intakeBar,shooter};
+    return {body,fill,intakeBar,shooter,turrets};
   }
   updateFill(visual,config,inventory){
     const fraction=Math.max(0,Math.min(1,inventory/config.capacity));
@@ -160,9 +168,9 @@ export class FieldView {
   }
   rebuildRobot(c){
     this.disposeGroup(this.chassis);this.activeVisual=this.genericRobot(this.chassis,c);this.intakeBar=this.activeVisual.intakeBar;
-    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection].join('|');
+    this.robotKey=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
   }
-  setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;}
+  setCamera(mode){this.mode=mode;this.pointer=null;this.zoom=1;this.driverHead=null;}
   resize(){const w=this.canvas.clientWidth,h=this.canvas.clientHeight;if(!w||!h)return;this.renderer.setSize(w,h,false);this.camera.aspect=w/h;this.camera.updateProjectionMatrix();}
   movement(x,y){
     const forward=new T.Vector3();this.camera.getWorldDirection(forward);forward.y=0;forward.normalize();
@@ -171,19 +179,25 @@ export class FieldView {
     return {moveX:right.x*x-forward.x*y,moveY:right.z*x-forward.z*y};
   }
   draw(sim,grid){
-    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection].join('|');
+    const now=performance.now(),cameraDt=this.cameraFrameTime===undefined?0:(now-this.cameraFrameTime)/1000;this.cameraFrameTime=now;
+    const c=sim.config,r=sim.robot,key=[c.width,c.length,c.height,c.alliance,c.team,c.archetype,c.lanes,c.shooterDirection,c.shooterMount,c.intakeDirection].join('|');
     if(this.robotKey!==key)this.rebuildRobot(c);this.gridGroup.visible=grid;
     const x=r.x-W/2,z=r.y-H/2;this.robot.position.set(x,r.z,z);this.robot.rotation.y=-r.a;
     this.chassis.rotation.set(-r.roll,0,r.pitch,'XYZ');this.intakeBar.material.color.set(sim.intake?'#c8a5ff':'#665b70');
-    const solution=sim.shotSolution,target=solution.target,aim=c.autoAim&&c.archetype==='turret'?sim.aimAngle:sim.shooterAngle;this.updateFill(this.activeVisual,c,sim.inventory);
+    const solution=sim.shotSolution,target=solution.target,aim=sim.shooterAngle;this.updateFill(this.activeVisual,c,sim.inventory);
     if(c.archetype==='turret')this.activeVisual.shooter.rotation.y=-(aim-r.a);
+    if(c.archetype==='double_turret')this.activeVisual.turrets.forEach((turret,i)=>{turret.rotation.y=-(sim.doubleTurretAngle(i)-r.a);});
     const parkedKeys=new Set();
     sim.fleet.forEach((entry,index)=>{
       if(index===sim.activeIndex)return;parkedKeys.add(index);
-      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection].join('|');
+      const pc=entry.config,pr=entry.robot,key=[pc.width,pc.length,pc.height,pc.alliance,pc.team,pc.archetype,pc.lanes,pc.shooterDirection,pc.shooterMount,pc.intakeDirection].join('|');
       let visual=this.parkedVisuals.get(index);
       if(!visual||visual.key!==key){if(visual){this.disposeGroup(visual.group);this.scene.remove(visual.group);}const group=new T.Group();this.scene.add(group);visual={group,key,...this.genericRobot(group,pc)};this.parkedVisuals.set(index,visual);}
       visual.group.position.set(pr.x-W/2,pr.z,pr.y-H/2);visual.group.rotation.set(-pr.roll,-pr.a,pr.pitch,'YXZ');this.updateFill(visual,pc,entry.inventory);
+      const turretAngle=entry.turretAngle??entry.state?.turretAngle;
+      if(pc.archetype==='turret'&&Number.isFinite(turretAngle))visual.shooter.rotation.y=-(turretAngle-pr.a);
+      if(pc.archetype==='double_turret'&&Number.isFinite(turretAngle))visual.turrets.forEach(turret=>{turret.rotation.y=-(turretAngle-pr.a);});
+      visual.intakeBar.material.color.set((entry.intake??entry.state?.intake)?'#c8a5ff':'#665b70');
     });
     for(const [index,visual] of this.parkedVisuals)if(!parkedKeys.has(index)){this.disposeGroup(visual.group);this.scene.remove(visual.group);this.parkedVisuals.delete(index);}
     this.fuel.count=sim.balls.length;
@@ -196,15 +210,21 @@ export class FieldView {
     }
     const passing=solution.passing,points=[],d=solution.reach,flight=solution.flight,launch=r.z+c.height-.05;
     const vz=(target.z-launch+.5*9.81*flight*flight)/flight;
-    const manual=!c.autoAim||c.archetype==='dumper';
+    const manual=true;
     const origin=sim.shooterOrigin,power=Math.hypot(target.x-origin.x-r.vx*flight,target.y-origin.y-r.vy*flight)/flight;
     const vx=manual?Math.cos(aim)*power+r.vx:(target.x-r.x)/flight,vy=manual?Math.sin(aim)*power+r.vy:(target.y-r.y)/flight;
-    const muzzle=c.archetype==='dumper'?(c.shooterDirection==='back'?-1:1)*c.length*.30:0;
+    const muzzle=c.archetype==='dumper'?((c.shooterMount||c.shooterDirection)==='back'?-1:1)*c.length*.30:0;
     for(let i=0;i<=24;i++){const t=i/24*flight;points.push(new T.Vector3(x+Math.cos(r.a)*muzzle+vx*t,launch+vz*t-4.905*t*t,z+Math.sin(r.a)*muzzle+vy*t));}
     this.aimLine.geometry.dispose();this.aimLine.geometry=new T.BufferGeometry().setFromPoints(points);this.aimLine.computeLineDistances();this.aimLine.visible=sim.inventory>0;this.aimLine.material.color.set(passing||solution.outOfRange?'#f2ce64':'#c8a5ff');
     this.passMarker.visible=passing;this.passMarker.position.set(target.x-W/2,.025,target.y-H/2);
     const side=c.alliance==='blue'?-1:1,fit=this.camera.aspect<1.25?1.2:1;
-    if(this.mode==='driver'){
+    const fov=this.mode==='station'?Math.max(40,Math.min(90,68*this.zoom)):46;
+    if(this.camera.fov!==fov){this.camera.fov=fov;this.camera.updateProjectionMatrix();}
+    if(this.mode==='station'){
+      this.driverHead=driverStationPose(this.driverHead,{x,y:r.z+c.height*.65,z},{...c,stationY:Number.isFinite(r.startY)?r.startY-H/2:undefined},W,cameraDt);
+      const {eye,target}=this.driverHead;
+      this.camera.position.set(eye.x,eye.y,eye.z);this.cameraTarget.set(target.x,target.y,target.z);
+    }else if(this.mode==='driver'){
       this.camera.position.set(side*14*this.zoom*fit,14*this.zoom*fit,-side*5.5*this.zoom*fit);this.cameraTarget.set(side*1.2,.1,0);
     }else if(this.mode==='follow'){
       this.camera.position.lerp(new T.Vector3(x+side*6*this.zoom,7.5*this.zoom,z-side*2.3*this.zoom),.1);this.cameraTarget.set(x-side*1.3,.2,z);

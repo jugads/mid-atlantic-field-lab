@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: mid-atlantic-field-lab
+    runtime: node
+    plan: free
+    buildCommand: corepack pnpm install --frozen-lockfile
+    startCommand: node server/index.cjs
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ALLOWED_ORIGINS
+        value: https://stunning-flan-fd1b50.netlify.app
+      - key: MAX_ROOMS
+        value: "4"

@@ -1,0 +1,13 @@
+{
+  "name": "mid-atlantic-field-lab",
+  "version": "0.5.0",
+  "private": true,
+  "description": "Single-player and private two-player FRC field simulator",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server/index.cjs",
+    "test": "node tests/driver-camera.mjs && node tests/physics.cjs --quick && node tests/multiplayer.cjs && node tests/client.mjs && node tests/server.cjs"
+  },
+  "dependencies": { "ws": "8.22.0" },
+  "packageManager": "pnpm@10.11.0"
+}
