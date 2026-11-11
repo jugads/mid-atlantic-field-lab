@@ -20,6 +20,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
   };
   const red = defender.config.alliance === 'red', home = red ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const waitingToScore = role === 'score' && !canCrossTrench && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
+  const passing = role === 'pass' && sim.phase.id !== 'auto' && !sim.activeAt(defender.config.alliance);
   const leavingEarly = !!sim.phase.shift && sim.activeAt(defender.config.alliance) && sim.phaseRemaining <= 5;
   const scoring = waitingToScore || sim.phase.id === 'auto' || role === 'collect' || role === 'pass' || (role !== 'defend' && sim.activeAt(defender.config.alliance) && (!leavingEarly || role === 'score'));
   // A small defensive traction advantage affects contact, not top speed.
@@ -105,8 +106,15 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
       if (sim.time < state.escape.until && Math.abs(r.x - state.escape.x) > .2) return driveTo(state.escape.x, state.escape.y, true, 1);
       state.escape = null;
     }
+    // Passing requires shooting from outside our alliance zone. Leave home
+    // with any fuel instead of parking there with the trigger suppressed.
+    if (passing && home && defender.inventory > 0) {
+      state.collecting = false;
+      return crossTrench(false) || driveTo(red ? 10.8 : 5.74, r.y < 4.035 ? 2.51 : 5.56, true, 1);
+    }
     if (state.route) { const crossing = crossTrench(state.route.towardHome); if (crossing) return crossing; }
     if (!state.collecting && defender.inventory > 0) {
+      if (passing && !home) return { shoot: true, intake: true };
       if (!home) { const crossing = crossTrench(true); if (crossing) return crossing; }
       if (waitingToScore) return {};
       if (hard) {
@@ -126,6 +134,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
     // the center line during AUTO to avoid G403.
     const centerSafe = defender.config.length / 2 + .1;
     const eligible = b => !b.shot && !b.hubInside && b.z < .3 &&
+      (!passing || (red ? b.x < 16.54 - 4.03 : b.x > 4.03)) &&
       (red ? b.x >= 4.03 : b.x <= 16.54 - 4.03) &&
       (waitingToScore || !Number.isFinite(sim.phaseRemaining) || sim.phaseRemaining > 4 || (red ? b.x >= 16.54 - 4.03 : b.x <= 4.03)) &&
       (sim.phase.id !== 'auto' || (red ? b.x >= 16.54 / 2 + centerSafe : b.x <= 16.54 / 2 - centerSafe));
@@ -175,6 +184,7 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
       }
       return driveTo(ball.x, ball.y, true, 1, true);
     }
+    if (passing && home) return crossTrench(false) || {};
     if (waitingToScore) { state.collecting = false; return home ? {} : (crossTrench(true) || {}); }
     if (defender.inventory) { state.collecting = false; return home ? { shoot: true } : (crossTrench(true) || { shoot: true }); }
     return {};
@@ -366,7 +376,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   }
   const waitingToScore = role === 'score' && sim.phase.id !== 'auto' && !sim.activeAt(c.alliance) && !(globalThis.FieldPhysics?.canUseTrench?.(c) ?? ((c.height ?? 0) <= .5652 && (c.width ?? 0) <= 1.30));
   if (waitingToScore || (!active && home && ['collect','pass'].includes(role))) input.shoot = false;
-  else if (role === 'pass' && bot.inventory > 0 && !home) input.shoot = true;
+  else if (role === 'pass' && bot.inventory > 0 && !home && sim.phase.id !== 'auto' && (!sim.activeAt(c.alliance) || sim.phase.id === 'endgame')) input.shoot = true;
   else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active) || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
   return input;
 }
