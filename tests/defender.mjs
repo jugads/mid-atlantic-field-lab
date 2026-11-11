@@ -48,6 +48,14 @@ console.log('Passing role leaves home and shoots in inactive and endgame');
  b.inventory=1;s.time+=.1; assert(!defenderInput(s).shoot,'passer keeps collecting instead of firing each ball immediately');
 }
 console.log('Passers refill from dense fuel clusters');
+{
+ const cfg={alliance:'blue',length:.9,width:.8,height:.5,capacity:40,aiRole:'score'};
+ const bot={config:cfg,robot:{x:6.5,y:.69,a:0},inventory:40};
+ const s={fleet:[{robot:{x:15,y:6,vx:0,vy:0}},bot,{robot:{x:4.7,y:.69,vx:0,vy:0}}],phase:{id:'auto'},phaseRemaining:10,activeAt:()=>true,time:10,balls:[]};
+ const command=defenderInput(s,'medium',1,0);
+ assert(command.moveY>.1,'AUTO return avoids a teammate blocking the nearest trench');
+}
+console.log('AUTO return routes consider teammates');
 // Exercise a full scoring cycle and a return from the far side using real physics.
 const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
 const {Simulation}=require('../dist/physics.js');const {resolve}=require('../dist/team-presets.js');
