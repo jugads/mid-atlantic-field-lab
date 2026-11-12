@@ -2,6 +2,7 @@
 export const defenderTeam = () => '316';
 const scoringState = new WeakMap();
 const defenseState = new WeakMap();
+const teammateAvoidance = new WeakMap();
 function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentIndex = 0, role = 'auto') {
   const defender = sim.fleet[botIndex], opponent = sim.fleet[opponentIndex], noOpponent = !opponent, player = opponent?.robot || {x:-100,y:-100,vx:0,vy:0,a:0}, r = defender.robot;
   const hard = difficulty === 'hard', easy = difficulty === 'easy';
@@ -62,6 +63,9 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
           } else tandemLane = canCrossTrench && (!partnerTrench || !tandem.lead) ? nearest(trenchLanes, r.y) : nearest(bumpLanes, r.y);
           if (pass === 0) (state.autoLanes ||= []).push(tandemLane);
         }
+        // A tandem preference must not force a robot back into a lane that it
+        // just failed to traverse. Let recovery choose a different route.
+        if (state.avoidLane && sim.time < state.avoidLane.until && Math.abs(tandemLane - state.avoidLane.y) < .2) tandemLane = null;
         const lane = tandemLane ?? lanes.reduce((best, y) => {
           const cost = v => {
             const traffic = sim.fleet.reduce((sum, entry, index) => {
@@ -179,7 +183,8 @@ function planDefenderInput(sim, difficulty = 'medium', botIndex = 1, opponentInd
         const distance = Math.hypot(b.x - r.x, b.y - r.y);
         // Passing robots refill at the densest available cluster; distance
         // breaks ties, while blocked targets remain temporarily excluded.
-        const score = passing ? count : Math.min(defender.config.capacity - defender.inventory, count) / (1 + .6 * distance);
+        const claimed = [...states.entries()].some(([index, other]) => index !== botIndex && sim.fleet[index]?.config?.alliance === defender.config.alliance && other.collecting && other.target && Math.hypot(other.target.x-b.x,other.target.y-b.y)<1.25);
+        const score = (passing ? count : Math.min(defender.config.capacity - defender.inventory, count) / (1 + .6 * distance)) * (claimed ? .3 : 1);
         if (score > best || (score === best && distance < closest)) { best = score; closest = distance; state.target = b; }
       }
       state.targetSince = sim.time; state.targetDistance = closest;
@@ -389,7 +394,7 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   const role = (sim.fleet[botIndex].config.aiRole || 'auto') === 'auto' && opponentIndex < 0 ? 'pass' : (sim.fleet[botIndex].config.aiRole || 'auto');
   const input = planDefenderInput(sim, difficulty, botIndex, opponentIndex, role);
   const bot = sim.fleet[botIndex], c = bot.config, r = bot.robot;
-  const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(sim.phase.shift && sim.phaseRemaining <= 5));
+  const active = sim.phase.id === 'auto' || (sim.activeAt(c.alliance) && !(opponentIndex >= 0 && sim.phase.shift && sim.phaseRemaining <= 5 && role === 'auto'));
   const home = c.alliance === 'red' ? r.x >= 16.54 - 4.03 : r.x <= 4.03;
   const passClear = c.alliance === 'red' ? r.x < 16.54 - 4.03 - 1.194 - c.length / 2 - .08 : r.x > 4.03 + 1.194 + c.length / 2 + .08;
   const hubX = c.alliance === 'red' ? 16.54 - 4.627 : 4.627;
@@ -413,5 +418,27 @@ export function defenderInput(sim, difficulty = 'medium', botIndex = 1, opponent
   else if (role === 'pass' && !passClear && !sim.activeAt(c.alliance)) input.shoot = false;
   else if (role === 'pass' && bot.inventory > 0 && passClear && sim.phase.id === 'endgame') input.shoot = true;
   else if (bot.inventory > 0 && ['turret','double_turret'].includes(c.archetype) && ((!home && !active && role !== 'pass') || (active && home && Math.hypot(r.x-hubX,r.y-8.07/2) <= c.maxRange))) input.shoot = true;
+  // Give human drivers and lower-index teammates room in open carpet. Keep a
+  // chosen side briefly so a pair does not alternate directions in a circle.
+  // Crossing lanes retain their own obstruction and recovery logic.
+  const moving = Math.hypot(input.moveX || 0, input.moveY || 0);
+  if (sim.fleet.length > 2 && moving > .15 && (sim.phase.id === 'auto' || active || role !== 'defend') && Math.abs(r.x-hubX)>1.4) {
+    let states=teammateAvoidance.get(sim);if(!states){states=new Map();teammateAvoidance.set(sim,states);}
+    let avoid=states.get(botIndex);
+    if(avoid && (sim.time>avoid.until || Math.hypot(r.x-avoid.x,r.y-avoid.y)<.35)) {states.delete(botIndex);avoid=null;}
+    if(!avoid){
+      const vx=(input.moveX||0)/moving,vy=(input.moveY||0)/moving;
+      for(let i=0;i<botIndex;i++){
+        const other=sim.fleet[i];if(!other?.robot||other.config?.alliance!==c.alliance)continue;
+        const dx=other.robot.x-r.x,dy=other.robot.y-r.y,along=dx*vx+dy*vy,cross=dx*vy-dy*vx;
+        if(along>0 && along<1.8 && Math.abs(cross)<.95){
+          let side=cross>=0?1:-1,tx=other.robot.x-vy*side*1.25,ty=other.robot.y+vx*side*1.25;
+          if(ty<.65||ty>7.42){side=-side;tx=other.robot.x-vy*side*1.25;ty=other.robot.y+vx*side*1.25;}
+          avoid={x:Math.max(.65,Math.min(15.89,tx)),y:Math.max(.65,Math.min(7.42,ty)),until:sim.time+1.3};states.set(botIndex,avoid);break;
+        }
+      }
+    }
+    if(avoid){const dx=avoid.x-r.x,dy=avoid.y-r.y,d=Math.hypot(dx,dy)||1;input.moveX=dx/d;input.moveY=dy/d;}
+  }
   return input;
 }

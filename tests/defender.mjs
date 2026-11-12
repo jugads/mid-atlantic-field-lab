@@ -56,6 +56,20 @@ console.log('Passers refill from dense fuel clusters');
  assert(command.moveY>.1,'AUTO return avoids a teammate blocking the nearest trench');
 }
 console.log('AUTO return routes consider teammates');
+{
+ const c={alliance:'blue',length:.9,width:.8,height:.5,capacity:40,aiRole:'score',archetype:'dumper',maxRange:6};
+ const s={fleet:[{config:c,robot:{x:2,y:4,vx:0,vy:0}}, {config:c,robot:{x:3,y:4,a:0,vx:0,vy:0},inventory:0}, {config:c,robot:{x:8,y:7,a:0},inventory:0}],phase:{id:'auto'},phaseRemaining:15,activeAt:()=>true,time:3,balls:[{x:2.7,y:4,z:.075}]};
+ const input=defenderInput(s,'medium',1,-1);
+ assert(Math.abs(input.moveY)>.3,'AI steers around a teammate blocking its path');
+ s.time+=.2;const next=defenderInput(s,'medium',1,-1);
+ assert(Math.sign(next.moveY)===Math.sign(input.moveY),'teammate avoidance holds a consistent side');
+}
+{
+ const c={alliance:'blue',length:.9,width:.8,height:.5,capacity:40,aiRole:'auto',archetype:'turret',maxRange:6};
+ const s={fleet:[{config:c,robot:{x:1,y:1,vx:0,vy:0}},{config:c,robot:{x:3,y:4,a:0},inventory:8}],phase:{id:'shift2',shift:true},phaseRemaining:3,activeAt:()=>true,time:80,balls:[]};
+ assert(defenderInput(s,'medium',1,-1).shoot,'unopposed practice AI scores through the end of its active shift');
+}
+console.log('Teammates yield consistently and score through active practice shifts');
 // Exercise a full scoring cycle and a return from the far side using real physics.
 const {createRequire}=await import('node:module');const require=createRequire(import.meta.url);
 const {Simulation}=require('../dist/physics.js');const {resolve}=require('../dist/team-presets.js');
